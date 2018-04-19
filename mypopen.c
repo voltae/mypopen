@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <unistd.h> // for fork()
 #include <sys/types.h> // for getpid() and getppid()
+#include <sys/wait.h> // for waitpid
 
 // --------------------------------------------------------------- defines --
 
@@ -119,6 +120,20 @@ int createChildProcessRecursivly()
 
     pid = fork();
 
+    // waiting for termination of child process, only if we are in the parent process
+    if (pid == 0)
+    {
+        // get the child pid number
+        pid_t childPid = getpid();
+
+        if ((waitpid(childPid, 1, 0) < 0))
+        {
+            perror("Error in waiting for pid");
+        }
+    }
+
+
+
     // caputer an error if present
     if (pid < 0)
     {
@@ -138,7 +153,6 @@ int createChildProcessRecursivly()
     {
         printf("Get the pid of the child process: %d\n", getpid());
         printf("Get the pid of the parent process: %d\n", getppid());
-
 
 
         // make recursive call to create child process
