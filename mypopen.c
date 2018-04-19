@@ -25,11 +25,18 @@
 
 // --------------------------------------------------------------- defines --
 
+#define SUCCESS 0
+#define FAIL 1
+
 // -------------------------------------------------------------- typedefs --
 
 // --------------------------------------------------------------- globals --
 
+static int counter;
 // ------------------------------------------------------------- functions --
+
+int createChildProcess ();
+int createChildProcessRecursivly();
 
 //*
 // \brief The most minimalistic C program
@@ -46,7 +53,63 @@
 
 int main() {
 
+
+    int returnValue = createChildProcess();
+    if (returnValue < 0)
+    {
+        error(1, errno, "Error during fork");
+    }
+
+    returnValue = createChildProcessRecursivly();
+
+    return 0;
+}
+
+int createChildProcess () {
+
     // creating a new child process
+
+    // set errno to 0 to protocol an error
+    errno = 0;
+
+    // create an integer for the return value of the fork call
+    pid_t pid = 0;
+
+    pid = fork();
+
+    // capture an error if present
+    if (pid < 0)
+    {
+        perror("Error during fork");
+        return FAIL;
+    }
+
+
+    printf("The pid of the process is: %d!\n", pid);
+
+    // get the pid of the current process, the main method get executed twice, why?
+    // System call fork() is used to create processes. It takes no arguments and returns a process ID.
+    // The purpose of fork() is to create a new process, which becomes the child process of the caller.
+    // After a new child process is created, both processes will execute the next instruction following the fork() system call.
+    // Therefore, we have to distinguish the parent from the child. This can be done by testing the returned value of fork():
+
+
+    // distinguish between child and parent-prcess. parentprocess has the pid 0
+    if (pid != 0)
+    {
+        printf("Get the pid of the child process: %d\n", getpid());
+        printf("Get the pid of the parent process: %d\n", getppid());
+
+
+    }
+    return SUCCESS;
+
+}
+
+int createChildProcessRecursivly()
+{
+    // creating a new child process
+
 
     // set errno to 0 to protocol an error
     errno = 0;
@@ -59,14 +122,28 @@ int main() {
     // caputer an error if present
     if (pid < 0)
     {
-        error(1, errno, "Error occured during fork");
+        perror("Error during fork");
+        return FAIL;
     }
+
 
     printf("The pid of the process is: %d!\n", pid);
 
-    // get the pid of the current process
+    // counter has to be a global variable, local get set always after a child process get forked!
+    printf("Number of processes: %d\n", counter++);
 
-    printf("Get the pid of the child process: %d\n", getpid());
-    printf("Get the pid of the parent process: %d\n", getppid());
-    return 0;
+
+    // distinguish between child and parent-process. parentprocess has the pid 0
+    if (pid != 0)
+    {
+        printf("Get the pid of the child process: %d\n", getpid());
+        printf("Get the pid of the parent process: %d\n", getppid());
+
+
+
+        // make recursive call to create child process
+        createChildProcessRecursivly();
+
+    }
+    return SUCCESS;
 }
