@@ -20,9 +20,16 @@
 #include <errno.h>
 #include <error.h>
 #include <stdio.h>
+#include <stdlib.h>  // for exit()
 #include <unistd.h> // for fork()
 #include <sys/types.h> // for getpid() and getppid()
 #include <sys/wait.h> // for waitpid
+#include <unistd.h>
+#include <fcntl.h> // for open
+#include "mpopen.h"
+
+
+
 
 // --------------------------------------------------------------- defines --
 
@@ -36,8 +43,6 @@ static int counter;
 
 // ------------------------------------------------------------- functions --
 
-int createChildProcess ();
-int createChildProcessRecursivly();
 
 //*
 // \brief The most minimalistic C program
@@ -55,13 +60,15 @@ int createChildProcessRecursivly();
 int main() {
 
 
-    int returnValue = createChildProcess();
-    if (returnValue < 0)
-    {
-        error(1, errno, "Error during fork");
-    }
+    openPipe();
+  // int returnValue = createChildProcess();
+   // if (returnValue < 0)
+   // {
+    //    error(1, errno, "Error during fork");
+    //}
 
-    returnValue = createChildProcessRecursivly();
+   // returnValue = createChildProcessRecursivly();
+   // returnValue = createChildProcess();
 
     return 0;
 }
@@ -75,6 +82,7 @@ int createChildProcess () {
 
     // create an integer for the return value of the fork call
     pid_t pid = 0;
+    int status;
 
     pid = fork();
 
@@ -95,19 +103,69 @@ int createChildProcess () {
     // Therefore, we have to distinguish the parent from the child. This can be done by testing the returned value of fork():
 
 
-    // distinguish between child and parent-prcess. parentprocess has the pid 0
-    if (pid != 0)
-    {
+    // distinguish between child and parent-process. parent process has the pid 0
+   if (pid != 0)
+   {
         printf("Get the pid of the child process: %d\n", getpid());
         printf("Get the pid of the parent process: %d\n", getppid());
 
+       waitpid(pid, &status, 0);
+       printf("Waitpid, Status :%d", status);
 
     }
+
+
     return SUCCESS;
 
 }
 
-int createChildProcessRecursivly()
+void openPipe(char *filename)
+{
+    // filedescriptors
+    int fd[2];
+    // pid number
+    pid_t pid = 0;
+    int resultPipe = pipe (fd);
+
+    printf("resultPipe: %d\n", resultPipe);
+
+    pid = fork();
+
+    if (pid < 0)
+    {
+        perror("error in fork");
+        exit(1);
+    }
+    else if (pid == 0) {
+        char dirname[50];
+        printf("Child process\n");
+        printf("File directory: %s\n", getcwd(dirname, 50));
+        if (open("beliebiges_file.txt", O_RDWR) < 0) {
+            perror("Error in open");
+        }
+        // we close the read end of the pipe
+        close(fd[0]);
+    }
+
+    else if (pid > 0)
+    {
+       printf("Parent Process!\n");
+        if (open("testfile.txt", O_RDONLY) < 0)
+        {
+            perror("Error in readfile");
+        }
+        // we close the write end of the pipe
+
+        char dirname[50];
+        printf("File directory: %s\n", getcwd(dirname, 50));
+        close(fd[1]);
+        void *buf;
+        int bytesRead = read(fd[0], buf, 1024);
+        printf("From File: %s\n", (char*)buf);
+    }
+}
+/*
+void createChildProcessRecursivly()
 {
     // creating a new child process
 
@@ -119,6 +177,7 @@ int createChildProcessRecursivly()
     pid_t pid = 0;
 
     pid = fork();
+    int status;
 
     // waiting for termination of child process, only if we are in the parent process
     if (pid == 0)
@@ -126,15 +185,17 @@ int createChildProcessRecursivly()
         // get the child pid number
         pid_t childPid = getpid();
 
-        if ((waitpid(childPid, 1, 0) < 0))
+
+        if ((waitpid(childPid, &status, 0) < 0))
         {
             perror("Error in waiting for pid");
         }
+        printf("status: %d", status);
     }
 
 
 
-    // caputer an error if present
+    // capture an error if present
     if (pid < 0)
     {
         perror("Error during fork");
@@ -159,5 +220,4 @@ int createChildProcessRecursivly()
         createChildProcessRecursivly();
 
     }
-    return SUCCESS;
-}
+}*/
