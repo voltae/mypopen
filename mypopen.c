@@ -30,6 +30,8 @@
 #include "mpopen.h"
 
 
+
+
 // --------------------------------------------------------------- defines --
 
 #define SUCCESS 0
@@ -37,13 +39,10 @@
 
 #define BUFFERSIZE 256      // For read and write files
 
-
 // -------------------------------------------------------------- typedefs --
 
 // --------------------------------------------------------------- globals --
 static int counter;
-const char filenameSource[9] = "test.txt";
-const char filenameDest[14] = "copy_text.txt";
 
 // ------------------------------------------------------------- functions --
 
@@ -94,7 +93,7 @@ int createChildProcess () {
     if (pid < 0)
     {
         perror("Error during fork");
-        exit(1);
+        return FAIL;
     }
 
 
@@ -117,11 +116,13 @@ int createChildProcess () {
        printf("Waitpid, Status :%d", status);
 
     }
-    exit(0);
+
+
+    return SUCCESS;
 
 }
 
-void openPipe()
+void openPipe(char *filename)
 {
     // filedescriptors
     int fd[2];
@@ -140,7 +141,7 @@ void openPipe()
     }
     else if (pid == 0) {
         // get the fileDescriptor from the destination File
-         int fileDescrDest = open(filenameDest, O_WRONLY | O_CREAT, 0644);
+         int fileDescrDest = open("beliebiges_file.txt", O_WRONLY | O_CREAT, 0644);
         printf("Child process\n");
         if  (fileDescrDest < 0)
         {
@@ -157,37 +158,27 @@ void openPipe()
         {
             perror("error in read Bytes");
         }
-            // Everything worked from the pipe, lets close the read end as well
-        else
-        {
-            close(fd[0]);
-        }
         int writtenBytes = write(fileDescrDest, buf, strlen(buf)+1);
         if (writtenBytes < 0)
         {
             perror("Error in writing bytes");
-            exit(EXIT_FAILURE);
         }
         else
         {
             fprintf(stdout, "File read from parent: %s\n", buf);
-
-            // close desitnation file
             close(fileDescrDest);
-
         }
 
 
     }
 
-        // pid greater than 0, this is the parent process
     else if (pid > 0)
     {
         int fileDescriptorSource;
         printf("Parent Process!\n");
 
         // get the fileDescriptorSource from the source file
-        fileDescriptorSource = open(filenameSource, O_RDONLY);
+        fileDescriptorSource = open("test.txt", O_RDONLY);
         if (fileDescriptorSource < 0)
         {
             perror("Error in readfile");
@@ -197,22 +188,18 @@ void openPipe()
 
         // This is the Buffer for the File
         char buf[BUFFERSIZE];
-        // read 1024 bytes from the source file
+        // read 1024 bytes from the file
         int bytesRead = read(fileDescriptorSource, &buf, BUFFERSIZE);
         printf("From File: %s\n", buf);
-
 
         // now write the puffer to the pipe
         int writtenBytes = write(fd[1], buf, strlen(buf) +1);
         if (writtenBytes < 0)
         {
             perror("error in writebytes to pipe");
-            exit (EXIT_FAILURE);
         }
         else
         {
-            // close the write end of the pipe
-            close(fd[0]);
             fprintf(stdout, "File written to child: %s\n", buf);
             close(fileDescriptorSource);
         }

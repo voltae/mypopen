@@ -1,0 +1,37 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.26730.15
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mypopen", "mypopen\mypopen.vcxproj", "{408EFB9B-2EDE-47A1-97A4-4BFDD028EF4E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|ARM = Debug|ARM
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|ARM = Release|ARM
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{408EFB9B-2EDE-47A1-97A4-4BFDD028EF4E}.Debug|ARM.ActiveCfg = Debug|ARM
+		{408EFB9B-2EDE-47A1-97A4-4BFDD028EF4E}.Debug|ARM.Build.0 = Debug|ARM
+		{408EFB9B-2EDE-47A1-97A4-4BFDD028EF4E}.Debug|x64.ActiveCfg = Debug|x64
+		{408EFB9B-2EDE-47A1-97A4-4BFDD028EF4E}.Debug|x64.Build.0 = Debug|x64
+		{408EFB9B-2EDE-47A1-97A4-4BFDD028EF4E}.Debug|x86.ActiveCfg = Debug|x86
+		{408EFB9B-2EDE-47A1-97A4-4BFDD028EF4E}.Debug|x86.Build.0 = Debug|x86
+		{408EFB9B-2EDE-47A1-97A4-4BFDD028EF4E}.Release|ARM.ActiveCfg = Release|ARM
+		{408EFB9B-2EDE-47A1-97A4-4BFDD028EF4E}.Release|ARM.Build.0 = Release|ARM
+		{408EFB9B-2EDE-47A1-97A4-4BFDD028EF4E}.Release|x64.ActiveCfg = Release|x64
+		{408EFB9B-2EDE-47A1-97A4-4BFDD028EF4E}.Release|x64.Build.0 = Release|x64
+		{408EFB9B-2EDE-47A1-97A4-4BFDD028EF4E}.Release|x86.ActiveCfg = Release|x86
+		{408EFB9B-2EDE-47A1-97A4-4BFDD028EF4E}.Release|x86.Build.0 = Release|x86
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {437CD2E6-9ECA-40A6-AD96-A9E0ED000332}
+	EndGlobalSection
+EndGlobal
