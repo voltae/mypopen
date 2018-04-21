@@ -21,6 +21,7 @@
 #include <error.h>
 #include <stdio.h>
 #include <stdlib.h>  // for exit()
+#include <string.h>
 #include <unistd.h> // for fork()
 #include <sys/types.h> // for getpid() and getppid()
 #include <sys/wait.h> // for waitpid
@@ -35,6 +36,8 @@
 
 #define SUCCESS 0
 #define FAIL 1
+
+#define BUFFERSIZE 256      // For read and write files
 
 // -------------------------------------------------------------- typedefs --
 
@@ -137,31 +140,69 @@ void openPipe(char *filename)
         exit(1);
     }
     else if (pid == 0) {
-        char dirname[50];
+        // get the fileDescriptor from the destination File
+         int fileDescrDest = open("beliebiges_file.txt", O_WRONLY | O_CREAT, 0644);
         printf("Child process\n");
-        printf("File directory: %s\n", getcwd(dirname, 50));
-        if (open("beliebiges_file.txt", O_RDWR) < 0) {
+        if  (fileDescrDest < 0)
+        {
             perror("Error in open");
         }
-        // we close the read end of the pipe
-        close(fd[0]);
+        // we close the write end of the pipe, since we want to read from the pipe
+        close(fd[1]);
+
+        // allocate a buffer to read
+        char buf[BUFFERSIZE];
+        // read the file from the pipe
+        int readBytes = read(fd[0], buf, BUFFERSIZE);
+        if (readBytes < 0)
+        {
+            perror("error in read Bytes");
+        }
+        int writtenBytes = write(fileDescrDest, buf, strlen(buf)+1);
+        if (writtenBytes < 0)
+        {
+            perror("Error in writing bytes");
+        }
+        else
+        {
+            fprintf(stdout, "File read from parent: %s\n", buf);
+            close(fileDescrDest);
+        }
+
+
     }
 
     else if (pid > 0)
     {
-       printf("Parent Process!\n");
-        if (open("testfile.txt", O_RDONLY) < 0)
+        int fileDescriptorSource;
+        printf("Parent Process!\n");
+
+        // get the fileDescriptorSource from the source file
+        fileDescriptorSource = open("test.txt", O_RDONLY);
+        if (fileDescriptorSource < 0)
         {
             perror("Error in readfile");
         }
-        // we close the write end of the pipe
+        // we close the read end of the pipe, we want to write to the child process
+        close(fd[0]);
 
-        char dirname[50];
-        printf("File directory: %s\n", getcwd(dirname, 50));
-        close(fd[1]);
-        void *buf;
-        int bytesRead = read(fd[0], buf, 1024);
-        printf("From File: %s\n", (char*)buf);
+        // This is the Buffer for the File
+        char buf[BUFFERSIZE];
+        // read 1024 bytes from the file
+        int bytesRead = read(fileDescriptorSource, &buf, BUFFERSIZE);
+        printf("From File: %s\n", buf);
+
+        // now write the puffer to the pipe
+        int writtenBytes = write(fd[1], buf, strlen(buf) +1);
+        if (writtenBytes < 0)
+        {
+            perror("error in writebytes to pipe");
+        }
+        else
+        {
+            fprintf(stdout, "File written to child: %s\n", buf);
+            close(fileDescriptorSource);
+        }
     }
 }
 /*
