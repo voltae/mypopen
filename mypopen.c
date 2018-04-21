@@ -4,7 +4,7 @@
 // Beispiel 0
 //
 // @author Valentin Platzgummer <ic17b096@technikum-wien.at>
-// @author Lara Kammerer <ic17xxxx@technikum-wien.at>
+// @author Lara Kammerer <ic17b001@technikum-wien.at>
 // @date 2018/04/19
 //
 // @version 1
