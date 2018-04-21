@@ -139,51 +139,51 @@ void openPipe(char *filename)
         perror("error in fork");
         exit(1);
     }
-    else if (pid == 0) {
+    else if (pid == 0) { //we are in child process
         // get the fileDescriptor from the destination File
-         int fileDescrDest = open("beliebiges_file.txt", O_WRONLY | O_CREAT, 0644);
+         int fileDescrDest = open("beliebiges_file.txt", O_WRONLY | O_CREAT, 0644); //wozu übergibst du einen mode?---------------------------------------------
         printf("Child process\n");
         if  (fileDescrDest < 0)
         {
             perror("Error in open");
         }
-        // we close the write end of the pipe, since we want to read from the pipe
+        // we close the write end of the pipe, since we want to read from the pipe-------why the write end if we want to write from parent to child? or do we want to read?-------------
         close(fd[1]);
 
         // allocate a buffer to read
         char buf[BUFFERSIZE];
         // read the file from the pipe
-        int readBytes = read(fd[0], buf, BUFFERSIZE);
+        int readBytes = read(fd[0], buf, BUFFERSIZE); //wouldn't it be read from the write end of the pipe?-------------------------------------------------------------
         if (readBytes < 0)
         {
             perror("error in read Bytes");
         }
-        int writtenBytes = write(fileDescrDest, buf, strlen(buf)+1);
+        int writtenBytes = write(fileDescrDest, buf, strlen(buf)+1); //writes from buf in fileDescrDest
         if (writtenBytes < 0)
         {
             perror("Error in writing bytes");
         }
         else
         {
-            fprintf(stdout, "File read from parent: %s\n", buf);
+            fprintf(stdout, "File read from parent: %s\n", buf); //zum anschauen ob es geklappt hat würd ich eher schaun was im beliebiges_file.txt drin steht bzw im fileDescrDest------------
             close(fileDescrDest);
         }
 
 
     }
 
-    else if (pid > 0)
+    else if (pid > 0) //we are in parent process
     {
         int fileDescriptorSource;
         printf("Parent Process!\n");
 
         // get the fileDescriptorSource from the source file
-        fileDescriptorSource = open("test.txt", O_RDONLY);
+        fileDescriptorSource = open("test.txt", O_RDONLY); //bei den flags bin ich mir übrigens nicht sicher..da wärs toll wenn du die mit mir nochmal durchgehn könntest---
         if (fileDescriptorSource < 0)
         {
             perror("Error in readfile");
         }
-        // we close the read end of the pipe, we want to write to the child process
+        // we close the read end of the pipe, we want to write to the child process---------think it's the false end we're closing...------------------------------
         close(fd[0]);
 
         // This is the Buffer for the File
@@ -193,7 +193,7 @@ void openPipe(char *filename)
         printf("From File: %s\n", buf);
 
         // now write the puffer to the pipe
-        int writtenBytes = write(fd[1], buf, strlen(buf) +1);
+        int writtenBytes = write(fd[1], buf, strlen(buf) +1); //----------------------------...and therefore the false end we're using...-------------------------
         if (writtenBytes < 0)
         {
             perror("error in writebytes to pipe");
