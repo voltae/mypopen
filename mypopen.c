@@ -27,6 +27,7 @@
 #include <sys/wait.h> // for waitpid
 #include <unistd.h>
 #include <fcntl.h> // for open
+#include <assert.h> // for assert
 #include "mpopen.h"
 
 
@@ -260,8 +261,7 @@ void openPipe() {
             // allocate a buffer to read
             char buf[BUFFERSIZE];
             // read the file from the pipe
-            int readBytes = read(fd[0], buf,
-                                 BUFFERSIZE); //wouldn't it be read from the write end of the pipe?-------------------------------------------------------------
+            int readBytes = read(fd[0], buf, BUFFERSIZE); //wouldn't it be read from the write end of the pipe?-------------------------------------------------------------
             if (readBytes < 0) {
                 perror("error in read Bytes");
             }
@@ -270,6 +270,7 @@ void openPipe() {
             else {
                 close(fd[0]);
             }
+
             int writtenBytes = write(fileDescrDest, buf, strlen(buf) + 1); //writes from buf in fileDescrDest
 
 
@@ -280,11 +281,11 @@ void openPipe() {
 
 
                 // close desitnation file
-                fprintf(stdout, "File read from parent: %s\n",
-                        buf); //zum anschauen ob es geklappt hat w�rd ich eher schaun was im beliebiges_file.txt drin steht bzw im fileDescrDest------------
+                fprintf(stdout, "File read from parent: %s\n", buf); //zum anschauen ob es geklappt hat w�rd ich eher schaun was im beliebiges_file.txt drin steht bzw im fileDescrDest------------
 
                 // Copy the filedescriptor to standard out, as pointed in the task description
-                //dup2(fileDescrDest, STDOUT_FILENO);
+                int stdout_save = dup(STDOUT_FILENO);
+
 
                 // Close the open File
                 close(fileDescrDest);
@@ -299,7 +300,7 @@ void openPipe() {
                 //endregion
                 fprintf(stdout, "------- cat statement end -------\n");
                 // if execl fails, this line is executed.
-                exit(EXIT_FAILURE);
+                assert(0);
 
 
             }
