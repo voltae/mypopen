@@ -46,7 +46,10 @@ const char filenameSource[9] = "test.txt";
 const char filenameDest[14] = "copy_text.txt";
 
 // ------------------------------------------------------------- functions --
-
+void openPipe(void);
+static void printError (const char *errorMessage);
+static FILE * ParentPipeStream (int modus, int fd[]);
+static FILE * ChildPipeStream (int modus, int fd[]);
 
 //*
 // \brief The most minimalistic C program
@@ -59,24 +62,122 @@ const char filenameDest[14] = "copy_text.txt";
 // \return always "success"
 // \retval 0 always
 //
+static void printError (const char *errorMessage)
+{
+    if (errorMessage != NULL)
+    {
+        perror(errorMessage);
+    }
 
+    exit(EXIT_FAILURE);
+}
 
 int main() {
 
 
     openPipe();
-  // int returnValue = createChildProcess();
-   // if (returnValue < 0)
-   // {
+    // int returnValue = createChildProcess();
+    // if (returnValue < 0)
+    // {
     //    error(1, errno, "Error during fork");
     //}
 
-   // returnValue = createChildProcessRecursivly();
-   // returnValue = createChildProcess();
+    // returnValue = createChildProcessRecursivly();
+    // returnValue = createChildProcess();
 
     return 0;
 }
 
+/// @brief configure the parent process
+///
+/// @param modus ste the parent either to read 0 or write 1
+/// @param fd[] array of file descriptors
+///
+/// @return file Pointer to stream on sucess, null on failure
+/// @error errno is set, function leaves with exit failure
+static FILE * ParentPipeStream (int modus, int fd[])
+{
+    errno = 0;
+    FILE *parentStream = NULL;
+    switch (modus)
+    {
+        // parent process in read modus
+        case 0:
+        {
+            if (close(fd[1] == -1))
+            {
+                printError("Error in close write Descriptor");
+
+            }
+            // try to open a file stream to read the pipe
+            if ((parentStream = fdopen(fd[0], "r")) == (FILE *)NULL)
+            {
+                printError("Error in read pipe");
+            }
+        }
+            // parent process in write modus
+        case 1:
+        {
+            if (close(fd[0] == -1))
+            {
+                printError("Error in close read Descriptor");
+
+            }
+            // try to open a file stream to read the pipe
+            if ((parentStream = fdopen(fd[1], "w")) == (FILE *)NULL)
+            {
+                printError("Error in write pipe");
+            }
+        }
+
+    }
+
+    return parentStream;
+}
+
+/// @brief Create the file stream for the child process
+/// @param modus 0 for read, 1 for write
+/// @return filestream child process
+/// @error errno is set, function leaves with exit failure
+static FILE * ChildPipeStream (int modus, int fd[])
+{
+    errno = 0;
+    FILE *childStream = NULL;
+    switch (modus)
+    {
+        // child process in read modus
+        case 0:
+        {
+            if (close(fd[1] == -1))
+            {
+                printError("Error in close write Descriptor");
+
+            }
+            // try to open a file stream to read the pipe
+            if ((childStream = fdopen(fd[0], "r")) == (FILE *)NULL)
+            {
+                printError("Error in read pipe");
+            }
+        }
+            // parent process in write modus
+        case 1:
+        {
+            if (close(fd[0] == -1))
+            {
+                printError("Error in close read Descriptor");
+
+            }
+            // try to open a file stream to read the pipe
+            if ((childStream = fdopen(fd[1], "w")) == (FILE *)NULL)
+            {
+                printError("Error in write pipe");
+            }
+        }
+
+    }
+
+    return childStream;
+}
 int createChildProcess () {
 
     // creating a new child process
@@ -108,123 +209,145 @@ int createChildProcess () {
 
 
     // distinguish between child and parent-process. parent process has the pid 0
-   if (pid != 0)
-   {
+    if (pid != 0)
+    {
         printf("Get the pid of the child process: %d\n", getpid());
         printf("Get the pid of the parent process: %d\n", getppid());
 
-       waitpid(pid, &status, 0);
-       printf("Waitpid, Status :%d", status);
+        waitpid(pid, &status, 0);
+        printf("Waitpid, Status :%d", status);
 
     }
     exit(0);
 
 }
 
-void openPipe()
-{
+
+
+void openPipe() {
     // filedescriptors
     int fd[2];
     // pid number
     pid_t pid = 0;
-    int resultPipe = pipe (fd);
+    int resultPipe = pipe(fd);
 
     printf("resultPipe: %d\n", resultPipe);
 
-    pid = fork();
+    switch (pid = fork()) {
 
-    if (pid < 0)
-    {
-        perror("error in fork");
-        exit(1);
-    }
-    else if (pid == 0) { //we are in child process
-        // get the fileDescriptor from the destination File
+        case -1:
+            perror("error in fork");
+            exit(1);
+            break;
 
-         int fileDescrDest = open(filenameDest, O_WRONLY | O_CREAT, 0644); //wozu �bergibst du einen mode? VALENTIN: O_CREATE legt ein neues Gile an falls es nicht existiert mit den File Permissions 644
+            //we are in child process
+        case 0: {
+            // get the fileDescriptor from the destination File
+
+            int fileDescrDest = open(filenameDest, O_WRONLY | O_CREAT,
+                                     0644); //wozu �bergibst du einen mode? VALENTIN: O_CREATE legt ein neues File an falls es nicht existiert mit den File Permissions 644
 
 
-        printf("Child process\n");
-        if  (fileDescrDest < 0)
-        {
-            perror("Error in open");
+            printf("Child process\n");
+            if (fileDescrDest < 0) {
+                perror("Error in open");
+
+            }
+
+            // we close the write end of the pipe, since we want to read from the pipe-------why the write end if we want to write from parent to child? or do we want to read?-------------
+            close(fd[1]);
+
+            // allocate a buffer to read
+            char buf[BUFFERSIZE];
+            // read the file from the pipe
+            int readBytes = read(fd[0], buf,
+                                 BUFFERSIZE); //wouldn't it be read from the write end of the pipe?-------------------------------------------------------------
+            if (readBytes < 0) {
+                perror("error in read Bytes");
+            }
+
+                // Everything worked from the pipe, lets close the read end as well
+            else {
+                close(fd[0]);
+            }
+            int writtenBytes = write(fileDescrDest, buf, strlen(buf) + 1); //writes from buf in fileDescrDest
+
+
+            if (writtenBytes < 0) {
+                perror("Error in writing bytes");
+                exit(EXIT_FAILURE);
+            } else {
+
+
+                // close desitnation file
+                fprintf(stdout, "File read from parent: %s\n",
+                        buf); //zum anschauen ob es geklappt hat w�rd ich eher schaun was im beliebiges_file.txt drin steht bzw im fileDescrDest------------
+
+                // Copy the filedescriptor to standard out, as pointed in the task description
+                //dup2(fileDescrDest, STDOUT_FILENO);
+
+                // Close the open File
+                close(fileDescrDest);
+
+                // execute the cat command
+                //region cat the current file
+                fprintf(stdout, "------- cat statement begin -------\n");
+                if (execl("/bin/cat", "cat",filenameDest , NULL) < 0)
+                {
+                    perror("error in execl function");
+                }
+                //endregion
+                fprintf(stdout, "------- cat statement end -------\n");
+                // if execl fails, this line is executed.
+                exit(EXIT_FAILURE);
+
+
+            }
+
+            break;
         }
-        // we close the write end of the pipe, since we want to read from the pipe-------why the write end if we want to write from parent to child? or do we want to read?-------------
-        close(fd[1]);
 
-        // allocate a buffer to read
-        char buf[BUFFERSIZE];
-        // read the file from the pipe
-        int readBytes = read(fd[0], buf, BUFFERSIZE); //wouldn't it be read from the write end of the pipe?-------------------------------------------------------------
-        if (readBytes < 0)
-        {
-            perror("error in read Bytes");
-        }
+            // pid greater than 0, this is the parent process
+        default: {
 
-            // Everything worked from the pipe, lets close the read end as well
-        else
-        {
+            int fileDescriptorSource;
+            printf("Parent Process!\n");
+
+            // get the fileDescriptorSource from the source file
+            fileDescriptorSource = open(filenameSource,
+                                        O_RDONLY); //bei den flags bin ich mir �brigens nicht sicher..da w�rs toll wenn du die mit mir nochmal durchgehn k�nntest--- VAL: ja
+            if (fileDescriptorSource < 0) {
+                perror("Error in readfile");
+            }
+            // we close the read end of the pipe, we want to write to the child process---------think it's the false end we're closing...------------------------------
+            // VAL: So schient es aber zu funktioneren. Außerdem "if the parent wands to send data to the child, it shoulds close fd[0], and the child should close fd[1]. GNU Creating Pipes in C
             close(fd[0]);
-        }
-        int writtenBytes = write(fileDescrDest, buf, strlen(buf)+1); //writes from buf in fileDescrDest
+
+            // This is the Buffer for the File
+            char buf[BUFFERSIZE];
+            // read 1024 bytes from the source file
+            int bytesRead = read(fileDescriptorSource, &buf, BUFFERSIZE);
+            printf("From File: %s\n", buf);
 
 
-        if (writtenBytes < 0)
-        {
-            perror("Error in writing bytes");
-            exit(EXIT_FAILURE);
-        }
-        else
-        {
+            // now write the puffer to the pipe
+            int writtenBytes = write(fd[1], buf, strlen(buf) +
+                                                 1); //----------------------------...and therefore the false end we're using...-------------------------
+            if (writtenBytes < 0) {
+                perror("error in writebytes to pipe");
+                exit(EXIT_FAILURE);
+            }
+            else
+            {
+                // close the write end of the pipe
+                close(fd[0]);
+                fprintf(stdout, "File written to child: %s\n", buf);
 
-            fprintf(stdout, "File read from parent: %s\n", buf);
+                // close the open Source File
+                close(fileDescriptorSource);
 
-            // close desitnation file
-            fprintf(stdout, "File read from parent: %s\n", buf); //zum anschauen ob es geklappt hat w�rd ich eher schaun was im beliebiges_file.txt drin steht bzw im fileDescrDest------------
-            close(fileDescrDest);
-
-        }
-
-
-    }
-
-        // pid greater than 0, this is the parent process
-    else if (pid > 0)
-    {
-        int fileDescriptorSource;
-        printf("Parent Process!\n");
-
-        // get the fileDescriptorSource from the source file
-        fileDescriptorSource = open(filenameSource, O_RDONLY);
-        fileDescriptorSource = open("test.txt", O_RDONLY); //bei den flags bin ich mir �brigens nicht sicher..da w�rs toll wenn du die mit mir nochmal durchgehn k�nntest--- VAL: ja
-        if (fileDescriptorSource < 0)
-        {
-            perror("Error in readfile");
-        }
-        // we close the read end of the pipe, we want to write to the child process---------think it's the false end we're closing...------------------------------
-        // VAL: So schient es aber zu funktioneren. Außerdem "if the parent wands to send data to the child, it shoulds close fd[0], and the child should close fd[1]. GNU Creating Pipes in C
-        close(fd[0]);
-
-        // This is the Buffer for the File
-        char buf[BUFFERSIZE];
-        // read 1024 bytes from the source file
-        int bytesRead = read(fileDescriptorSource, &buf, BUFFERSIZE);
-        printf("From File: %s\n", buf);
-
-
-        // now write the puffer to the pipe
-        int writtenBytes = write(fd[1], buf, strlen(buf) +1); //----------------------------...and therefore the false end we're using...-------------------------
-        if (writtenBytes < 0)
-        {
-            perror("error in writebytes to pipe");
-            exit (EXIT_FAILURE);
-        }
-        else
-        {
-            // close the write end of the pipe
-            close(fd[0]);
-            fprintf(stdout, "File written to child: %s\n", buf);
-            close(fileDescriptorSource);
+                break;
+            }
         }
     }
 }
