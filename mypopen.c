@@ -5,7 +5,7 @@
 //
 // @author Valentin Platzgummer <ic17b096@technikum-wien.at>
 // @author Lara Kammerer <ic17b001@technikum-wien.at>
-// @date 2018/04/19
+// @date 2018/04/23
 //
 // @version 1
 //
@@ -34,7 +34,7 @@
 // --------------------------------------------------------------- defines --
 
 /// @def distinguish between read file and write file
-/// 0 for readd and 1 for write
+/// 0 for read and 1 for write
 #define M_READ 0
 #define M_WRITE 1
 
@@ -46,6 +46,7 @@
 #define EXECSHELL "sh"
 /// @def execution command
 #define EXECCOMM "-c"
+// ------------------------------------------------------------------ enum --
 
 
 // -------------------------------------------------------------- typedefs --
@@ -58,8 +59,8 @@ static pid_t pid;
 // ------------------------------------------------------------- functions --
 
 static void printError (const char *errorMessage);
-static FILE * ParentPipeStream (int modus, int fd[]);
-static FILE * ChildPipeStream (int modus, int fd[]);
+static FILE * ParentPipeStream (int modus, int *fd);
+static FILE * ChildPipeStream (int modus, int *fd);
 
 //*
 // \brief The most minimalistic C program
@@ -89,7 +90,7 @@ static void printError (const char *errorMessage)
 
 
 // todo: if usage is not correct, do we print out usage message?
-static void usage (void)
+static void usageError (void)
 {
     printError("Usage: mypopen (command, type)");
 }
@@ -100,32 +101,37 @@ static void usage (void)
 /// @param type The type argument is a pointer to a null-terminated string  which  must  contain either the letter 'r' for reading or the letter 'w' for writing.
 extern FILE *mypopen (const char *command, const char *type)
 {
-    // todo: first do the correct type check.
+    //first do the correct type check. type is only 1 element long and either 'w' or 'r'
+    if (strlen (type) > 1  || (type[0] != "w" || type[0] != "r"))
+    {
+        printError("Wrong use of type");
+    }
 
-
-    // change the mode to the enum created above
+    // change the type to the define created above
 
 
     // define an array for the file-descriptors of the pipe
     int fd[2];
 
     // create a new pipe for the program with error checking
-    if (pipe(fd) -1)
+    if (pipe(fd) == -1)
     {
         printError("Error during create pipe");
     }
 
-    // get an integer rapresenting the mode
-
-
-    // fork the current process
-    // todo: it should be open only one pipe open. check this!
+    // fork the current process. It should always be open only one pipe
+    // check if a process is running by asking the pid if is not 0
+    if (pid != 0)
+    {
+        printError("A process is running");
+    }
 
     // Define the Filepointer for the to processes
     FILE *fp_parent_process = NULL;
     FILE *fp_child_process = NULL;
 
-    // allocate a buffer for the command send o the child process
+    // allocate a buffer for the command sent to the child process
+
     char commandBuffer[BUFFERSIZE];
     switch (pid = fork())
     {
@@ -133,61 +139,73 @@ extern FILE *mypopen (const char *command, const char *type)
             printError("Error in fork process");
             break;
 
-            // we are in the chid proces
+            // we are in the child process
         case 0:
         {
             // if type is "r" the pipe is in read modus, means parent is reading, child is writing
-            if (*type == "r")
+            if (type[0] == "r")
             {
                 // pipe is in write mode from childs perspective
                 fp_child_process = ChildPipeStream(M_WRITE, fd);
-
-
-
             }
                 // pipe is in read mode from childs perspective
-            else if (*type == "w")
+            else if (type[0] == "w")
             {
-
                 fp_child_process = ChildPipeStream(M_READ, fd);
-
             }
-
-            // default path, should not happen
+            // default path type is missuses, should not happen
             else
             {
                 assert(0);
             }
-        execl(EXECPATH, EXECSHELL, EXECCOMM, command);
+
+            // execute the current command.
+            execl(EXECPATH, EXECSHELL, EXECCOMM, command);
+            // if we get to this point, ann error occurred,
+            printError("Error in execute line");
         }
 
         // we are in the parent process
         default:
         {
             // if type is "r" the pipe is in read modus from parents perspective
-            if (*type == "r") {
+            if (type[0] == "r") {
                 fp_parent_process = ParentPipeStream(M_READ, fd);
             }
-            else if (*type == "w")
+            else if (type[0] == "w")
             {
                 fp_parent_process = ParentPipeStream(M_WRITE, fd);
             }
                 // default path, should not happen
             else
             {
-                assert(0);
+               assert(0);
             }
         }
-
     }
 
     return fp_parent_process;
 }
 
-
 extern int mypclose (FILE *stream)
 {
+    int status;
+    if ((waitpid(pid, &status, WUNTRACED)) == -1)
+    {
+        printError("Error in waitpid");
+    }
 
+    // reset pid to zero so it can be tested if a fork is already running
+    pid = 0;
+
+
+    // close file Pointer
+    if (fclose(stream) == EOF)
+    {
+        printError("Error in close file");
+    }
+
+    exit(EXIT_SUCCESS);
 }
 
 
@@ -198,7 +216,7 @@ extern int mypclose (FILE *stream)
 ///
 /// @return file Pointer to stream on sucess, null on failure
 /// @error errno is set, function leaves with exit failure
-static FILE * ParentPipeStream (int modus, int fd[])
+static FILE * ParentPipeStream (int modus, int *fd)
 {
     errno = 0;
     FILE *parentStream = NULL;
@@ -244,7 +262,7 @@ static FILE * ParentPipeStream (int modus, int fd[])
 /// @param modus 0 for read, 1 for write
 /// @return filestream child process
 /// @error errno is set, function leaves with exit failure
-static FILE * ChildPipeStream (int modus, int fd[])
+static FILE * ChildPipeStream (int modus, int *fd)
 {
     errno = 0;
     FILE *childStream = NULL;
@@ -253,7 +271,7 @@ static FILE * ChildPipeStream (int modus, int fd[])
         // child process in read modus
         case M_READ:
         {
-            if (close(fd[M_WRITE] == -1))
+            if (close(fd[M_WRITE]) == -1)
             {
                 printError("Error in close write Descriptor");
 
@@ -274,7 +292,7 @@ static FILE * ChildPipeStream (int modus, int fd[])
             // parent process in write modus
         case M_WRITE:
         {
-            if (close(fd[M_READ] == -1))
+            if (close(fd[M_READ]) == -1)
             {
                 printError("Error in close read Descriptor");
 
