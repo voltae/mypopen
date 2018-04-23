@@ -102,7 +102,7 @@ static void usageError (void)
 extern FILE *mypopen (const char *command, const char *type)
 {
     //first do the correct type check. type is only 1 element long and either 'w' or 'r'
-    if (strlen (type) > 1  || (type[0] != "w" || type[0] != "r"))
+    if (strlen (type) > 1  || (*type != "w" || *type != "r"))
     {
         printError("Wrong use of type");
     }
@@ -142,13 +142,13 @@ extern FILE *mypopen (const char *command, const char *type)
         case 0:
         {
             // if type is "r" the pipe is in read modus, means parent is reading, child is writing
-            if (type[0] == "r")
+            if (*type == "r")
             {
                 // pipe is in write mode from childs perspective
                 fp_child_process = ChildPipeStream(M_WRITE, fd);
             }
                 // pipe is in read mode from childs perspective
-            else if (type[0] == "w")
+            else if (*type == "w")
             {
                 fp_child_process = ChildPipeStream(M_READ, fd);
             }
@@ -168,10 +168,10 @@ extern FILE *mypopen (const char *command, const char *type)
         default:
         {
             // if type is "r" the pipe is in read modus from parents perspective
-            if (type[0] == "r") {
+            if (*type == "r") {
                 fp_parent_process = ParentPipeStream(M_READ, fd);
             }
-            else if (type[0] == "w")
+            else if (*type == "w")
             {
                 fp_parent_process = ParentPipeStream(M_WRITE, fd);
             }
