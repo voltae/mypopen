@@ -9,7 +9,6 @@ OBJ = mypopen.o
 
 all: test
 
-
 # link against the testfolder on annuminas
 test:
     $(CC) -o popentest $(OBJ) -lpopentest -ldl
