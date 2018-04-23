@@ -102,7 +102,7 @@ static void usageError (void)
 extern FILE *mypopen (const char *command, const char *type)
 {
     //first do the correct type check. type is only 1 element long and either 'w' or 'r'
-    if (strlen (type) > 1  || (strncpy(type, "w", 1) == 0) || (strncpy(type, "r", 1)) == 0)
+    if (strlen (type) > 1  || (strncmp(type, "w", 1) == 0) || (strncmp(type, "r", 1)) == 0)
     {
         printError("Wrong use of type");
     }
