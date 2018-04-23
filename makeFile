@@ -3,18 +3,18 @@ CFLAGS = -Wall -Werror -Wextra -Wstrict-prototypes -Wformat=2 -pedantic -fno-com
 CC = gcc52
 LDLIBS = -lm
 OBJ = mypopen.o
+HEADER = mypopen.h
+TEST = popentest
 
-%.o: %.c
-	$(CC) $(CFLAGS) -c $<
-
-all: test
+all: mypopen.c
+    $(CC) $(CFLAGS) -c $(HEADER) $(TEST).c
 
 # link against the testfolder on annuminas
-test:
-    $(CC) -o popentest $(OBJ) -lpopentest -ldl
+test: $(OBJ)
+    $(CC) -o$(TEST) $(OBJ) -lpopentest -ldl
 
 # link against the dynamic test suite test-pipe
-test-pipe:
+test-pipe: $(OBJ)
     $(CC) -o test-pipe $(OBJ) -ltest-pipe
 
 .phony : clean

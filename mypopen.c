@@ -82,7 +82,7 @@ static void printError (const char *errorMessage)
 {
     if (errorMessage != NULL)
     {
-        printError(errorMessage);
+        perror(errorMessage);
     }
 
     exit(EXIT_FAILURE);
@@ -131,7 +131,7 @@ extern FILE *mypopen (const char *command, const char *type)
     FILE *fp_child_process = NULL;
 
     // allocate a buffer for the command sent to the child process
-   // char commandBuffer[BUFFERSIZE];
+    char commandBuffer[BUFFERSIZE];
     switch (pid = fork())
     {
         case -1:
@@ -159,7 +159,7 @@ extern FILE *mypopen (const char *command, const char *type)
             }
 
             // execute the current command.
-            execl(EXECPATH, EXECSHELL, EXECCOMM, command);
+            execl(EXECPATH, EXECSHELL, EXECCOMM, command, NULL);
             // if we get to this point, ann error occurred,
             printError("Error in execute line");
         }
