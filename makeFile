@@ -1,0 +1,27 @@
+# Define the required macros
+CFLAGS = -Wall -Werror -Wextra -Wstrict-prototypes -Wformat=2 -pedantic -fno-common -ftrapv -O3 -g -std=gnu11
+CC = gcc52
+LDLIBS = -lm
+OBJ = mypopen.o
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $<
+
+all: test
+
+
+# link against the testfolder on annuminas
+test:
+    $(CC) -o popentest $(OBJ) -lpopentest -ldl
+
+# link against the dynamic test suite test-pipe
+test-pipe:
+    $(CC) -o test-pipe $(OBJ) -ltest-pipe
+
+.phony : clean
+
+clean:
+	rm -f *.o mypopen
+
+
+# todo: insert doxy generator rule
