@@ -56,11 +56,14 @@ static pid_t pid;
 
 // ------------------------------------------------------------- functions --
 
-static void printError(const char *errorMessage);
+static void printError(const char *errorMessage, int lineNumber);
 
-static FILE *ParentPipeStream(int modus, int *fd);
+// check if char is in string
+static int isCharInString(const char * string);
 
-void ChildPipeStream(int modus, int *fd);
+static FILE *ParentPipeStream(int modus, int fd[]);
+
+void ChildPipeStream(int modus, int fd[]);
 
 //*
 // \brief The most minimalistic C program
@@ -78,11 +81,11 @@ void ChildPipeStream(int modus, int *fd);
 /// @brief function prints out an error message
 /// @param errorMessage Message to diplay
 /// @return nothing
-static void printError(const char *errorMessage)
+static void printError(const char *errorMessage, int lineNumber)
 {
     if (errorMessage != NULL)
     {
-        fprintf(stderr, "%s, errno: %d, errdescr: %s\n", errorMessage, errno, strerror(errno));
+        fprintf(stderr, "%d %s, errno: %d, errdescr: %s\n",lineNumber, errorMessage, errno, strerror(errno));
     }
 }
 // TODO: delete this code after debugging.
@@ -103,7 +106,7 @@ extern FILE *mypopen(const char *command, const char *type)
         commandBuffer[strlen(commandBuffer)] = 0;
 
     testingPrint("Testing type");
-    printf("Type length: %lu, char: %s, last element: %d\n", strlen(type), type, type[strlen(type)]);
+    printf("Type length: %zu, char: %s, last element: %d\n", strlen(type), type, type[strlen(type)]);
 
     testingPrint("arguments");
     printf("Command: %s, commandBuffer: %s, type: %s\n", command, commandBuffer, type);
@@ -111,9 +114,17 @@ extern FILE *mypopen(const char *command, const char *type)
     printf("last Element of Command: %d, CommandBuffer: %d\n", command[strlen(command) -1], commandBuffer[strlen(commandBuffer) -1]);
 
     //first do the correct type check. type is only 1 element long and either 'w' or 'r'
-    if ((strncmp(type, "w", 1) != 0) || (strncmp(type, "r", 1)) != 0)
+    if (isCharInString(type) == 0)
     {
-        printError("Type check wrong");
+        printError("Type check wrong", __LINE__);
+        // set errno to invalid operation
+        errno = EINVAL;
+        return NULL;
+    }
+        // or the type is longer than 1 character
+    else if (strlen(type) > 1)
+    {
+        printError("Type check wrong", __LINE__);
         // set errno to invalid operation
         errno = EINVAL;
         return NULL;
@@ -125,14 +136,16 @@ extern FILE *mypopen(const char *command, const char *type)
     // create a new pipe for the program with error checking
     if (pipe(fd) == -1)
     {
-        printError("Error in creating pipe");
+        printError("Error in creating pipe", __LINE__);
     }
 
+    testingPrint("file descripors");
+    printf("pipe[0]: %d, pipe[1]: %d\n", fd[0], fd[1]);
     // fork the current process. It should always be open only one pipe
     // check if a process is running by asking the pid if is not 0
     if (pid != 0)
     {
-        printError("A process is running");
+        printError("A process is running", __LINE__);
     }
 
     // Define the Filepointer for the parent process
@@ -142,20 +155,20 @@ extern FILE *mypopen(const char *command, const char *type)
     switch (pid = fork())
     {
         case -1:
-            printError("Error in fork process");
+            printError("Error in fork process", __LINE__);
             break;
 
             // we are in the child process
         case 0:
         {
             // if type is "r" the pipe is in read modus, means parent is reading, child is writing
-            if (strncmp(type, "r", 1) == 0)
+            if (type[0] == 'r')
             {
                 // pipe is in write mode from childs perspective
                 ChildPipeStream(M_WRITE, fd);
             }
                 // pipe is in read mode from childs perspective
-            else if (strncmp(type, "w", 1) == 0)
+            else if (type[0] == 'w')
             {
                 ChildPipeStream(M_READ, fd);
             }
@@ -168,18 +181,18 @@ extern FILE *mypopen(const char *command, const char *type)
             // execute the current command.
             execl(EXECPATH, EXECSHELL, EXECCOMM, commandBuffer, NULL);
             // if we get to this point, ann error occurred,
-            printError("Error in execute line");
+            printError("Error in execute line", __LINE__);
         }
 
             // we are in the parent process
         default:
         {
             // if type is "r" the pipe is in read modus from parents perspective
-            if (strncmp(type, "r", 1) == 0)
+            if (type[0] == 'r')
             {
                 fp_parent_process = ParentPipeStream(M_READ, fd);
             }
-            else if (strncmp(type, "w", 1) == 0)
+            else if (type[0] == 'w')
             {
                 fp_parent_process = ParentPipeStream(M_WRITE, fd);
             }
@@ -199,7 +212,7 @@ extern int mypclose(FILE *stream)
     int status;
     if ((waitpid(pid, &status, WUNTRACED)) == -1)
     {
-        printError("Error in waitpid");
+        printError("Error in waitpid", __LINE__);
         // set errno to invalid child, if the child pid is not the one we are waiting for.
         errno = ECHILD;
     }
@@ -209,7 +222,7 @@ extern int mypclose(FILE *stream)
     // close file Pointer
     if (fclose(stream) == EOF)
     {
-        printError("Error in close file");
+        printError("Error in close file", __LINE__);
     }
 
     return 0;
@@ -223,7 +236,7 @@ extern int mypclose(FILE *stream)
 ///
 /// @return file Pointer to stream on sucess, null on failure
 /// @error errno is set, function leaves with exit failure
-static FILE *ParentPipeStream(int modus, int *fd)
+static FILE *ParentPipeStream(int modus, int fd[])
 {
     errno = 0;
     FILE *parentStream = NULL;
@@ -232,16 +245,16 @@ static FILE *ParentPipeStream(int modus, int *fd)
         // parent process in read modus
         case M_READ:
         {
-            // close the rwrite end of the pipe
+            // close the write end of the pipe
             if (close(fd[M_WRITE] == -1))
             {
-                printError("Error in close write Descriptor");
+                printError("Error in close write Descriptor", __LINE__);
 
             }
             // try to open a file stream to read the pipe
             if ((parentStream = fdopen(fd[M_READ], "r")) == (FILE *) NULL)
             {
-                printError("Error in read pipe");
+                printError("Error in read pipe", __LINE__);
             }
         }
             // parent process in write modus
@@ -250,13 +263,13 @@ static FILE *ParentPipeStream(int modus, int *fd)
 
             if (close(fd[M_READ] == -1))
             {
-                printError("Error in close read Descriptor");
-
+                printError("Error in close read Descriptor", __LINE__);
+                printf("read: %d, write: %d\n",fd[M_READ], fd[M_WRITE]);
             }
             // try to open a file stream to read the pipe
             if ((parentStream = fdopen(fd[M_WRITE], "w")) == (FILE *) NULL)
             {
-                printError("Error in write pipe");
+                printError("Error in write pipe", __LINE__);
             }
         }
 
@@ -269,52 +282,70 @@ static FILE *ParentPipeStream(int modus, int *fd)
 /// @param modus 0 for read, 1 for write
 /// @return nothing
 /// @error errno is set, function leaves with exit failure
-void ChildPipeStream(int modus, int *fd)
+void ChildPipeStream(int modus, int fd[])
 {
     errno = 0;
     FILE *childStream = NULL;
     switch (modus)
     {
-        // child process in read modus
+        // child process in write modus
         case M_READ:
         {
-            if (close(fd[M_WRITE]) == -1)
+           /* if (close(fd[M_READ]) == -1)
             {
-                printError("Error in close write Descriptor");
+                printError("Error in close write Descriptor", __LINE__);
 
-            }
+            }*/
             // try to open a file stream to read the pipe
-            if ((childStream = fdopen(fd[M_READ], "r")) == (FILE *) NULL)
+            if ((childStream = fdopen(fd[M_WRITE], "r")) == (FILE *) NULL)
             {
-                printError("Error in read pipe");
+                printError("Error in read pipe", __LINE__);
             }
 
             // Redirect the stdin to the pipe in order to read from pipe and check error
-            if (dup2(fd[M_READ], STDIN_FILENO) == -1)
+            if (dup2(fd[M_WRITE], STDOUT_FILENO) == -1)
             {
-                printError("Error in duplicating stdin");
+                printError("Error in duplicating stdin", __LINE__);
             }
 
         }
-            // parent process in write modus
+            // child process in read modus
         case M_WRITE:
         {
-            if (close(fd[M_READ]) == -1)
+           /* if (close(fd[M_WRITE]) == -1)
             {
-                printError("Error in close read Descriptor");
-            }
+                printError("Error in close read Descriptor", __LINE__);
+            }*/
             // try to open a file stream to read the pipe
-            if ((childStream = fdopen(fd[M_WRITE], "w")) == (FILE *) NULL)
+            if ((childStream = fdopen(fd[M_READ], "w")) == (FILE *) NULL)
             {
-                printError("Error in write pipe");
+                printError("Error in write pipe", __LINE__);
             }
 
             // redirect the stdout to the the read input of the pipe in order to write to the pipe
-            if (dup2(fd[M_WRITE], STDOUT_FILENO) == -1)
+            if (dup2(fd[M_READ], STDIN_FILENO) == -1)
             {
-                printError("Error in duplicating stdout");
+                printError("Error in duplicating stdout", __LINE__);
             }
         }
     }
+}
 
+static int isCharInString(const char * string)
+{
+    unsigned int contains = 0;
+    unsigned int i = 0;
+    while (!contains && i < strlen(string))
+    {
+        if (string[i] == 'r')
+        {
+            contains = 1;
+        }
+        else if (string[i] == 'w')
+        {
+            contains = 1;
+        }
+        i++;
+    }
+    return contains;
 }
