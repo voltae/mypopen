@@ -85,7 +85,7 @@ static void printError(const char *errorMessage)
         fprintf(stderr, "%s, errno: %d, errdescr: %s\n", errorMessage, errno, strerror(errno));
     }
 }
-
+// TODO: delete this code after debugging.
 static void testingPrint(const char *testingMessage)
 {
     printf("line: %d, message: %s\n", __LINE__, testingMessage);
@@ -96,13 +96,22 @@ static void testingPrint(const char *testingMessage)
 /// @param type The type argument is a pointer to a null-terminated string  which  must  contain either the letter 'r' for reading or the letter 'w' for writing.
 extern FILE *mypopen(const char *command, const char *type)
 {
+    // create a new buffer for the command
+    char commandBuffer[strlen(command)];
+    // check if the last lement of command is carry return
+        strncpy(commandBuffer, command, strlen(command)-1);
+        commandBuffer[strlen(commandBuffer)] = 0;
+
+    testingPrint("Testing type");
+    printf("Type length: %lu, char: %s, last element: %d\n", strlen(type), type, type[strlen(type)]);
+
     testingPrint("arguments");
-    printf("Command: %s, type: %s\n", command, type);
-    // last element of commant is carry return! 10
-    printf("last Element of Commant: %d\n", command[strlen(command) -1]);
+    printf("Command: %s, commandBuffer: %s, type: %s\n", command, commandBuffer, type);
+    // last element of command is carry return! 10
+    printf("last Element of Command: %d, CommandBuffer: %d\n", command[strlen(command) -1], commandBuffer[strlen(commandBuffer) -1]);
 
     //first do the correct type check. type is only 1 element long and either 'w' or 'r'
-    if (strlen(type) > 1 || (strncmp(type, "w", 1) != 0) || (strncmp(type, "r", 1)) != 0)
+    if ((strncmp(type, "w", 1) != 0) || (strncmp(type, "r", 1)) != 0)
     {
         printError("Type check wrong");
         // set errno to invalid operation
@@ -157,7 +166,7 @@ extern FILE *mypopen(const char *command, const char *type)
             }
 
             // execute the current command.
-            execl(EXECPATH, EXECSHELL, EXECCOMM, command, NULL);
+            execl(EXECPATH, EXECSHELL, EXECCOMM, commandBuffer, NULL);
             // if we get to this point, ann error occurred,
             printError("Error in execute line");
         }
