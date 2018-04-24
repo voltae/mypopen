@@ -1,3 +1,8 @@
+# Valentin Platzgummer - ic17b06@technikum-wien.at
+# Lara Kammerer - ic17b001technikum-wien.at
+# Makefile - mypopen mit Linking zu den test Libraries
+# für Verwendung am annuminas server, oder local, wenn die Libraries offline heruntergeladen sind
+
 # Define the required macros
 CFLAGS = -Wall -Werror -Wextra -Wstrict-prototypes -Wformat=2 -pedantic -fno-common -ftrapv -O3 -g -std=gnu11
 CC = gcc
