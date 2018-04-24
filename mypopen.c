@@ -42,10 +42,7 @@
 #define EXECCOMM "-c"
 // ------------------------------------------------------------------ enum --
 /// @enum distinguish between read file and write file
-enum operation
-{
-    M_READ, M_WRITE
-};
+enum operation { M_READ, M_WRITE };
 
 // -------------------------------------------------------------- typedefs --
 
@@ -57,9 +54,10 @@ static pid_t pid;
 // ------------------------------------------------------------- functions --
 
 static void printError(const char *errorMessage, int lineNumber);
+static int commandCheck(const char *command, const char *type);
 
 // check if char is in string
-static int isCharInString(const char * string);
+/*static int isCharInString(const char * string);*/
 
 static FILE *ParentPipeStream(int modus, int fd[]);
 
@@ -79,7 +77,7 @@ void ChildPipeStream(int modus, int fd[]);
 
 
 /// @brief function prints out an error message
-/// @param errorMessage Message to diplay
+/// @param errorMessage Message to display
 /// @return nothing
 static void printError(const char *errorMessage, int lineNumber)
 {
@@ -101,32 +99,15 @@ extern FILE *mypopen(const char *command, const char *type)
 {
     // create a new buffer for the command
     char commandBuffer[strlen(command)];
-    // check if the last lement of command is carry return
-        strncpy(commandBuffer, command, strlen(command)-1);
-        commandBuffer[strlen(commandBuffer)] = 0;
-
-    testingPrint("Testing type");
-    printf("Type length: %zu, char: %s, last element: %d\n", strlen(type), type, type[strlen(type)]);
-
-    testingPrint("arguments");
-    printf("Command: %s, commandBuffer: %s, type: %s\n", command, commandBuffer, type);
-    // last element of command is carry return! 10
-    printf("last Element of Command: %d, CommandBuffer: %d\n", command[strlen(command) -1], commandBuffer[strlen(commandBuffer) -1]);
-
-    //first do the correct type check. type is only 1 element long and either 'w' or 'r'
-    if (isCharInString(type) == 0)
+    // check if the last element of command is carry return
+    if (strncpy(commandBuffer, command, strlen(command)-1) == NULL)
     {
-        printError("Type check wrong", __LINE__);
-        // set errno to invalid operation
-        errno = EINVAL;
-        return NULL;
+        printError("Error copying th command argument", __LINE__);
     }
-        // or the type is longer than 1 character
-    else if (strlen(type) > 1)
+    commandBuffer[strlen(commandBuffer)] = 0;
+
+    if (commandCheck(command, type) == 0)
     {
-        printError("Type check wrong", __LINE__);
-        // set errno to invalid operation
-        errno = EINVAL;
         return NULL;
     }
 
@@ -146,6 +127,8 @@ extern FILE *mypopen(const char *command, const char *type)
     if (pid != 0)
     {
         printError("A process is running", __LINE__);
+        errno = EAGAIN;
+        return NULL;
     }
 
     // Define the Filepointer for the parent process
@@ -177,11 +160,12 @@ extern FILE *mypopen(const char *command, const char *type)
             {
                 assert(0);
             }
-
             // execute the current command.
             execl(EXECPATH, EXECSHELL, EXECCOMM, commandBuffer, NULL);
+
             // if we get to this point, ann error occurred,
             printError("Error in execute line", __LINE__);
+            break;
         }
 
             // we are in the parent process
@@ -201,20 +185,30 @@ extern FILE *mypopen(const char *command, const char *type)
             {
                 assert(0);
             }
+            break;
         }
     }
 
     return fp_parent_process;
 }
 
+/// @brief The pclose() function waits for the associated process to terminate and returns the exit status of the command as returned by wait4(2).
+/// @returns the exit staus of the wait system call
 extern int mypclose(FILE *stream)
 {
-    int status;
+
+    // a process with pipe is already running
+    if (pid != 0)
+    {
+        errno = ECHILD;
+        exit(EXIT_FAILURE);
+    }
+    int status = 0;
     if ((waitpid(pid, &status, WUNTRACED)) == -1)
     {
         printError("Error in waitpid", __LINE__);
         // set errno to invalid child, if the child pid is not the one we are waiting for.
-        errno = ECHILD;
+        errno = EAGAIN;
     }
     // reset pid to zero so it can be tested if a fork is already running
     pid = 0;
@@ -225,7 +219,7 @@ extern int mypclose(FILE *stream)
         printError("Error in close file", __LINE__);
     }
 
-    return 0;
+   exit(status);
 }
 
 
@@ -235,7 +229,7 @@ extern int mypclose(FILE *stream)
 /// @param fd[] array of file descriptors
 ///
 /// @return file Pointer to stream on sucess, null on failure
-/// @error errno is set, function leaves with exit failure
+/// @error errno is set appropately
 static FILE *ParentPipeStream(int modus, int fd[])
 {
     errno = 0;
@@ -256,6 +250,7 @@ static FILE *ParentPipeStream(int modus, int fd[])
             {
                 printError("Error in read pipe", __LINE__);
             }
+            break;
         }
             // parent process in write modus
         case M_WRITE:
@@ -271,8 +266,15 @@ static FILE *ParentPipeStream(int modus, int fd[])
             {
                 printError("Error in write pipe", __LINE__);
             }
+            break;
         }
 
+        // error catch, this part should never be executed
+        default:
+        {
+            assert(0);
+            break;
+        }
     }
 
     return parentStream;
@@ -300,6 +302,7 @@ void ChildPipeStream(int modus, int fd[])
             {
                 printError("Error in duplicating stout", __LINE__);
             }
+            break;
 
         }
             // child process in read modus
@@ -315,28 +318,43 @@ void ChildPipeStream(int modus, int fd[])
             {
                 printError("Error in duplicating stdin", __LINE__);
             }
+            break;
+        }
+            // error catch, this part should never be executed
+        default:
+        {
+            assert(0);
+            break;
         }
     }
 }
 
-/// @brief checks if the given string contains either 'w' or 'r'
-/// @param string to check
-/// @returns int 0 in case in does not contain, 1 if it contains.
-static int isCharInString(const char * string)
+static int commandCheck(const char *command, const char *type)
 {
-    unsigned int contains = 0;
-    unsigned int i = 0;
-    while (!contains && i < strlen(string))
+    //first do the correct type check. type is only 1 element long and either 'w' or 'r'
+    if ((type[0] != 'w' && type[0] != 'r') || type[1] != 0)
     {
-        if (string[i] == 'r')
-        {
-            contains = 1;
-        }
-        else if (string[i] == 'w')
-        {
-            contains = 1;
-        }
-        i++;
+        printError("Type check wrong", __LINE__);
+        // set errno to invalid operation
+        errno = EINVAL;
+        return 0;
     }
-    return contains;
+        // or the type is longer than 1 character
+    else if (strlen(type) > 1)
+    {
+        printError("Type check wrong", __LINE__);
+        // set errno to invalid operation
+        errno = EINVAL;
+        return 0;
+    }
+
+    if (command == NULL)
+    {
+        errno = EINVAL;
+        return 0;
+    }
+
+    return 1;
+
+
 }
