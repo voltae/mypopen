@@ -285,52 +285,43 @@ static FILE *ParentPipeStream(int modus, int fd[])
 void ChildPipeStream(int modus, int fd[])
 {
     errno = 0;
-    FILE *childStream = NULL;
     switch (modus)
     {
         // child process in write modus
         case M_READ:
         {
-           /* if (close(fd[M_READ]) == -1)
+            if (close(fd[M_READ]) == -1)
             {
                 printError("Error in close write Descriptor", __LINE__);
-
-            }*/
-            // try to open a file stream to read the pipe
-            if ((childStream = fdopen(fd[M_WRITE], "r")) == (FILE *) NULL)
-            {
-                printError("Error in read pipe", __LINE__);
             }
 
-            // Redirect the stdin to the pipe in order to read from pipe and check error
+            // Redirect the stdout to the pipe in order to read from pipe and check error
             if (dup2(fd[M_WRITE], STDOUT_FILENO) == -1)
             {
-                printError("Error in duplicating stdin", __LINE__);
+                printError("Error in duplicating stout", __LINE__);
             }
 
         }
             // child process in read modus
         case M_WRITE:
         {
-           /* if (close(fd[M_WRITE]) == -1)
+            if (close(fd[M_WRITE]) == -1)
             {
                 printError("Error in close read Descriptor", __LINE__);
-            }*/
-            // try to open a file stream to read the pipe
-            if ((childStream = fdopen(fd[M_READ], "w")) == (FILE *) NULL)
-            {
-                printError("Error in write pipe", __LINE__);
             }
 
-            // redirect the stdout to the the read input of the pipe in order to write to the pipe
+            // redirect the stdin to the the read input of the pipe in order to write to the pipe
             if (dup2(fd[M_READ], STDIN_FILENO) == -1)
             {
-                printError("Error in duplicating stdout", __LINE__);
+                printError("Error in duplicating stdin", __LINE__);
             }
         }
     }
 }
 
+/// @brief checks if the given string contains either 'w' or 'r'
+/// @param string to check
+/// @returns int 0 in case in does not contain, 1 if it contains.
 static int isCharInString(const char * string)
 {
     unsigned int contains = 0;
