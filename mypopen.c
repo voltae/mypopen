@@ -224,7 +224,7 @@ extern FILE *mypopen(const char *command, const char *type)
 
     }
     int status;
-    if (waitpid(actualProcess->childpid, &status,0) == -1)
+    if (waitpid(actualProcess->childpid, &status, WNOHANG) == -1)
     {
         printError("Exit failed", __LINE__);
         return NULL;
@@ -269,7 +269,14 @@ extern int mypclose(FILE *stream)
     // Check if the incoming stream is created with mypopen
     if (stream != actualProcess->filepointer)
     {
+        printError("Wrong stream to close",__LINE__);
         errno = EINVAL;
+
+        // if another process is open, close that instead
+        if (actualProcess->filepointer)
+        {
+            printError("Open another process instead", __LINE__);
+        }
         return INVALID;
     }
 
@@ -438,6 +445,12 @@ void ChildPipeStream(int modus, int fd[])
  */
 static isValid commandCheck(const char *command, const char *type)
 {
+    // test if on of the parameters is NULL
+    if ((command == NULL) || (type == NULL))
+    {
+        errno = EINVAL;
+        return INVALID;
+    }
 
     //first do the correct type check. type is only 1 element long and either 'w' or 'r'
     if ((type[0] != 'w' && type[0] != 'r') || type[1] != 0)
@@ -452,12 +465,6 @@ static isValid commandCheck(const char *command, const char *type)
     {
         printError("Type check wrong", __LINE__);
         // set errno to invalid operation
-        errno = EINVAL;
-        return INVALID;
-    }
-
-    if (command == NULL)
-    {
         errno = EINVAL;
         return INVALID;
     }
