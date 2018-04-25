@@ -44,6 +44,8 @@
 /// @enum distinguish between read file and write file
 enum operation { M_READ, M_WRITE };
 
+typedef enum isRunning {NOTRUNNING, RUNNING} isRunning;
+
 // -------------------------------------------------------------- typedefs --
 
 /// @enum distinuish between valid and invalid arguments
@@ -55,6 +57,7 @@ typedef struct childProcess
 {
     pid_t childpid;
     int fd;
+    FILE *filepointer;
 } childProcess;
 
 // --------------------------------------------------------------- globals --
@@ -68,7 +71,7 @@ static childProcess *actualProcess;
 /*!
  * @brief counts the number of actual childprocesses running
  */
-static unsigned int countOfProcess;
+static isRunning runs;
 // ------------------------------------------------------------- functions --
 
 static void printError(const char *errorMessage, int lineNumber);
@@ -130,7 +133,7 @@ extern FILE *mypopen(const char *command, const char *type)
     }
 
     // check if a process is running by asking the pid if is not 0
-    if (countOfProcess > 1)
+    if (runs == RUNNING)
     {
         errno = EAGAIN;
         printError("A process is running", __LINE__);
@@ -158,10 +161,12 @@ extern FILE *mypopen(const char *command, const char *type)
     FILE *fp_parent_process = NULL;
 
     // fork the current process. It should always be open only one pipe
-    switch (actualProcess->childpid = fork())
+    pid_t pid = actualProcess->childpid = fork();
+    switch (pid)
     {
         case -1:
             printError("Error in fork process", __LINE__);
+            return NULL;
             break;
 
             // we are in the child process
@@ -196,7 +201,7 @@ extern FILE *mypopen(const char *command, const char *type)
         default:
         {
             // increment the childprocess counter
-            countOfProcess++;
+            runs = RUNNING;
 
             // if type is "r" the pipe is in read modus from parents perspective
             if (type[0] == 'r')
@@ -213,11 +218,13 @@ extern FILE *mypopen(const char *command, const char *type)
                 assert(0);
             }
             break;
+
+
         }
 
     }
     int status;
-    if (waitpid(actualProcess->childpid, &status, WUNTRACED) == -1)
+    if (waitpid(actualProcess->childpid, &status,0) == -1)
     {
         printError("Exit failed", __LINE__);
         return NULL;
@@ -228,14 +235,16 @@ extern FILE *mypopen(const char *command, const char *type)
         if (WEXITSTATUS(status) == EXIT_SUCCESS)
         {
             printf("Terminated wit success: status: %d\n", status);
-            exit(EXIT_SUCCESS);
+            //exit(EXIT_SUCCESS);
         }
         else if (WEXITSTATUS(status) == EXIT_FAILURE)
         {
             printf("Terminated with error: %d, %s", errno, strerror(errno));
-            exit(EXIT_FAILURE);
+            //exit(EXIT_FAILURE);
         }
     }
+    // Storing the filepointer in the actual child struct
+    actualProcess->filepointer = fp_parent_process;
     return fp_parent_process;
 }
 
@@ -257,26 +266,36 @@ extern int mypclose(FILE *stream)
         return INVALID;
     }
 
+    // Check if the incoming stream is created with mypopen
+    if (stream != actualProcess->filepointer)
+    {
+        errno = EINVAL;
+        return INVALID;
+    }
+
     // The function fileno() examines the argument stream and returns its integer descriptor.
     fd = fileno(stream);
 
     if (fd != actualProcess->fd)
     {
-
+        printError("wrong file descriptor", __LINE__);
+        errno = ECHILD;
+        return INVALID;
     }
-    int status = 0;
+    /*int status = 0;
     if ((waitpid(actualProcess->childpid, &status, WUNTRACED)) == -1)
     {
         //  printError("Error in waitpid", __LINE__);
         // set errno to invalid child, if the child pid is not the one we are waiting for.
+        printError("Error waiting child in mypclose", __LINE__);
         errno = ECHILD;
         return INVALID;
-    }
+    }*/
     // deallocate the struct
     free(actualProcess);
     actualProcess = NULL;
     // decrement the counter
-    countOfProcess--;
+    runs = NOTRUNNING;
 
     // close file Pointer
     if (fclose(stream) == EOF)
@@ -344,6 +363,9 @@ static FILE *ParentPipeStream(int modus, int fd[])
             break;
         }
     }
+
+    // store the file descriptor for the current process
+    actualProcess->fd = *fd;
 
     return parentStream;
 }
