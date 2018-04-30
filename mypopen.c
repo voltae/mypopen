@@ -122,7 +122,7 @@ static void printError(const char *errorMessage, int lineNumber)
 extern FILE *mypopen(const char *command, const char *type)
 {
     // set errno to 0 to capture the right error message
-   errno = 0;
+    //errno = 0;
 
     // if no actual process is allocated, allocate a new childprocess struct
     if (actualProcess == NULL)
@@ -145,6 +145,7 @@ extern FILE *mypopen(const char *command, const char *type)
     // Check if the given arguments are valid
     if (commandCheck(command, type) == INVALID)
     {
+        errno = EINVAL;
         return NULL;
             }
 
@@ -264,9 +265,10 @@ extern FILE *mypopen(const char *command, const char *type)
 }
 
 /// @brief The pclose() function waits for the associated process to terminate and returns the exit status of the command as returned by wait4(2).
-/// @returns the exit staus of the wait system call
+/// @returns the exit status of the wait system call
 extern int mypclose(FILE *stream)
 {
+    fflush(stream);
     if (stream == NULL)
     {
         errno = EINVAL;
@@ -404,13 +406,15 @@ static FILE *ParentPipeStream(int modus, int fd[])
         case M_READ:
         {
             // close the write end of the pipe
-            if (close(fd[M_WRITE] == -1))
+
+            if (close(fd[M_WRITE]) == -1)
             {
                 printError("Error in close write Descriptor", __LINE__);
 
             }
             // try to open a file stream to read the pipe
-            if ((parentStream = fdopen(fd[M_READ], "r")) == (FILE *) NULL)
+            parentStream = fdopen(fd[M_READ], "r");
+            if (parentStream == NULL)
             {
                 printError("Error in read pipe", __LINE__);
                 return NULL;
@@ -421,13 +425,14 @@ static FILE *ParentPipeStream(int modus, int fd[])
         case M_WRITE:
         {
 
-            if (close(fd[M_READ] == -1))
+            if (close(fd[M_READ]) == -1)
             {
                 printError("Error in close read Descriptor", __LINE__);
                 printf("read: %d, write: %d\n",fd[M_READ], fd[M_WRITE]);
             }
-            // try to open a file stream to read the pipe
-            if ((parentStream = fdopen(fd[M_WRITE], "w")) == (FILE *) NULL)
+            // try to open a file stream to read the
+            parentStream = fdopen(fd[M_WRITE], "w");
+            if (parentStream == NULL)
             {
                 printError("Error in write pipe", __LINE__);
                 return NULL;
@@ -526,14 +531,6 @@ static isValid commandCheck(const char *command, const char *type)
 
     //first do the correct type check. type is only 1 element long and either 'w' or 'r'
     if ((type[0] != 'w' && type[0] != 'r') || type[1] != 0)
-    {
-        printError("Type check wrong", __LINE__);
-        // set errno to invalid operation
-        errno = EINVAL;
-        return INVALID;
-    }
-        // or the type is longer than 1 character
-    else if (strlen(type) > 1)
     {
         printError("Type check wrong", __LINE__);
         // set errno to invalid operation
