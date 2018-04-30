@@ -121,6 +121,8 @@ static void printError(const char *errorMessage, int lineNumber)
 /// @param type The type argument is a pointer to a null-terminated string  which  must  contain either the letter 'r' for reading or the letter 'w' for writing.
 extern FILE *mypopen(const char *command, const char *type)
 {
+    // set errno to 0 to capture the right error message
+   errno = 0;
 
     // if no actual process is allocated, allocate a new childprocess struct
     if (actualProcess == NULL)
@@ -223,6 +225,7 @@ extern FILE *mypopen(const char *command, const char *type)
         }
 
     }
+    // capture the wait state only for debugging
     int status;
     if (waitpid(actualProcess->childpid, &status, WNOHANG) == -1)
     {
@@ -232,28 +235,38 @@ extern FILE *mypopen(const char *command, const char *type)
 
     if (WIFEXITED(status))
     {
+        // return file stream only if the child terminated properly
         if (WEXITSTATUS(status) == EXIT_SUCCESS)
         {
-            printf("Terminated wit success: status: %d\n", status);
-            //exit(EXIT_SUCCESS);
+            printf("Terminated with success: status: %d\n", status);
+            // Storing the filepointer in the actual child struct
+            actualProcess->filepointer = fp_parent_process;
+            return fp_parent_process;
         }
         else if (WEXITSTATUS(status) == EXIT_FAILURE)
         {
             printf("Terminated with error: %d, %s", errno, strerror(errno));
             //exit(EXIT_FAILURE);
         }
+        else if (WIFSTOPPED(status)) {
+            printf("stopped by signal %d\n", WSTOPSIG(status));
+        } else if (WIFCONTINUED(status)) {
+            printf("continued\n");
+        }
+
     }
+    /*
     // Storing the filepointer in the actual child struct
     actualProcess->filepointer = fp_parent_process;
     return fp_parent_process;
+     */
+    return NULL;
 }
 
 /// @brief The pclose() function waits for the associated process to terminate and returns the exit status of the command as returned by wait4(2).
 /// @returns the exit staus of the wait system call
 extern int mypclose(FILE *stream)
 {
-    int fd;
-
     if (stream == NULL)
     {
         errno = EINVAL;
@@ -281,16 +294,17 @@ extern int mypclose(FILE *stream)
     }
 
     // The function fileno() examines the argument stream and returns its integer descriptor.
-    fd = fileno(stream);
-
-    if (fd != actualProcess->fd)
-    {
-        printError("wrong file descriptor", __LINE__);
-        errno = ECHILD;
-        return INVALID;
-    }
-    /*int status = 0;
-    if ((waitpid(actualProcess->childpid, &status, WUNTRACED)) == -1)
+    /* fd = fileno(stream);
+     * int fd
+      * if (fd != actualProcess->fd)
+      * {
+      *   printError("wrong file descriptor", __LINE__);
+      *   errno = ECHILD;
+      *   return INVALID;
+     * }
+      */
+    int status = 0;
+ /*   if ((waitpid(actualProcess->childpid, &status, WCONTINUED)) == -1)
     {
         //  printError("Error in waitpid", __LINE__);
         // set errno to invalid child, if the child pid is not the one we are waiting for.
@@ -298,7 +312,31 @@ extern int mypclose(FILE *stream)
         errno = ECHILD;
         return INVALID;
     }*/
-    // deallocate the struct
+
+        /* wait for terminating properly the child process */
+        do {
+            int waitStatus = waitpid(actualProcess->childpid, &status, WNOHANG | WUNTRACED | WCONTINUED);
+            if (waitStatus == -1) {
+                perror("waitpid");
+                return INVALID;
+            }
+
+            if (WIFEXITED(status)) {
+                printf("exited, status=%d\n", WEXITSTATUS(status));
+
+            } else if (WIFSIGNALED(status)) {
+                printf("killed by signal %d\n", WTERMSIG(status));
+                return INVALID;
+            } else if (WIFSTOPPED(status)) {
+                printf("stopped by signal %d\n", WSTOPSIG(status));
+                return INVALID;
+            } else if (WIFCONTINUED(status)) {
+                printf("continued\n");
+                return INVALID;
+            }
+        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+
+        // deallocate the struct
     free(actualProcess);
     actualProcess = NULL;
     // decrement the counter
@@ -314,6 +352,40 @@ extern int mypclose(FILE *stream)
     return VALID;
 }
 
+/* FIXME: Currently not in use */
+/*!
+ * @brief waits for terminating the child process
+ * @param childPid the ingoing child process pid
+ * @return enum either VALID, if all was correct or INVALID if an error occur
+ */
+
+/*isValid waitForChild(pid_t childPid)
+{
+    int status;
+    *//* wait for terminating properly the child process *//*
+    do {
+        int waitStatus = waitpid(actualProcess->childpid, &status, WNOHANG | WUNTRACED | WCONTINUED);
+        if (waitStatus == -1) {
+            perror("waitpid");
+            return INVALID;
+        }
+
+        if (WIFEXITED(status)) {
+            printf("exited, status=%d\n", WEXITSTATUS(status));
+            return VALID;
+
+        } else if (WIFSIGNALED(status)) {
+            printf("killed by signal %d\n", WTERMSIG(status));
+            return INVALID;
+        } else if (WIFSTOPPED(status)) {
+            printf("stopped by signal %d\n", WSTOPSIG(status));
+            return INVALID;
+        } else if (WIFCONTINUED(status)) {
+            printf("continued\n");
+            return INVALID;
+        }
+    } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+}*/
 
 /// @brief configure the parent process
 ///
