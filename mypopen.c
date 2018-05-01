@@ -28,6 +28,7 @@
 #include <unistd.h>
 #include <fcntl.h> // for open
 #include <assert.h> // for assert
+#include <sys/stat.h>
 #include "mypopen.h"
 
 
@@ -228,7 +229,8 @@ extern FILE *mypopen(const char *command, const char *type)
     }
     // capture the wait state only for debugging
     int status;
-    if (waitpid(actualProcess->childpid, &status, WNOHANG) == -1)
+    pid_t childPid = waitpid(actualProcess->childpid, &status, WNOHANG);
+    if (childPid == -1)
     {
         printError("Exit failed", __LINE__);
         return NULL;
@@ -317,8 +319,9 @@ extern int mypclose(FILE *stream)
 
         /* wait for terminating properly the child process */
         do {
-            int waitStatus = waitpid(actualProcess->childpid, &status, WNOHANG | WUNTRACED | WCONTINUED);
-            if (waitStatus == -1) {
+            pid_t childPid = waitpid(actualProcess->childpid, &status, WNOHANG | WUNTRACED | WCONTINUED);
+            // check if wait returns the pid
+            if (childPid == -1) {
                 perror("waitpid");
                 return INVALID;
             }
@@ -344,6 +347,8 @@ extern int mypclose(FILE *stream)
     // decrement the counter
     runs = NOTRUNNING;
 
+    // flush the stream before closing
+    fflush(stream);
     // close file Pointer
     if (fclose(stream) == EOF)
     {
@@ -351,6 +356,7 @@ extern int mypclose(FILE *stream)
         return INVALID;
     }
 
+    stream = NULL;
     return VALID;
 }
 
@@ -399,6 +405,7 @@ extern int mypclose(FILE *stream)
 static FILE *ParentPipeStream(int modus, int fd[])
 {
     errno = 0;
+
     FILE *parentStream = NULL;
     switch (modus)
     {
@@ -406,13 +413,14 @@ static FILE *ParentPipeStream(int modus, int fd[])
         case M_READ:
         {
             // close the write end of the pipe
-
-            if (close(fd[M_WRITE]) == -1)
+            int statusCloseWrite = close(fd[M_WRITE]);
+            if (statusCloseWrite == -1)
             {
                 printError("Error in close write Descriptor", __LINE__);
 
             }
             // try to open a file stream to read the pipe
+            printf("Parent fd[%d]: %d\n", M_READ, fd[M_READ]);
             parentStream = fdopen(fd[M_READ], "r");
             if (parentStream == NULL)
             {
@@ -424,12 +432,14 @@ static FILE *ParentPipeStream(int modus, int fd[])
             // parent process in write modus
         case M_WRITE:
         {
-
-            if (close(fd[M_READ]) == -1)
+           // int statusCloseRead = close(fd[M_READ]);
+           /* if (statusCloseRead == -1)
             {
                 printError("Error in close read Descriptor", __LINE__);
                 printf("read: %d, write: %d\n",fd[M_READ], fd[M_WRITE]);
             }
+*/
+            printf("Parent fd[%d]: %d\n", M_WRITE, fd[M_WRITE]);
             // try to open a file stream to read the
             parentStream = fdopen(fd[M_WRITE], "w");
             if (parentStream == NULL)
@@ -466,19 +476,22 @@ void ChildPipeStream(int modus, int fd[])
         // child process in write modus
         case M_READ:
         {
-            if (close(fd[M_READ]) == -1)
+            int statusCloseRead = close(fd[M_READ]);
+            if (statusCloseRead == -1)
             {
                 printError("Error in close read Descriptor", __LINE__);
             }
 
             // Redirect the stdout to the pipe in order to read from pipe and check error
-            if (dup2(fd[M_WRITE], STDOUT_FILENO) == -1)
+            int statusDupWrite = dup2(fd[M_WRITE], STDOUT_FILENO);
+            if (statusDupWrite == -1)
             {
                 printError("Error in duplicating stout", __LINE__);
             }
 
             // After redirection close the filedescriptor fd write
-            if (close(fd[M_WRITE]) == -1)
+            int statusCloseWrite = close(fd[M_WRITE]);
+            if (statusCloseWrite == -1)
             {
                 printError("Error in close child -write Descriptor", __LINE__);
             }
@@ -487,19 +500,24 @@ void ChildPipeStream(int modus, int fd[])
             // child process in read modus
         case M_WRITE:
         {
-            if (close(fd[M_WRITE]) == -1)
+            // Test
+           // int statusCloseWrite = close(fd[M_WRITE]);
+            int statusCloseWrite = close(fd[M_WRITE]);
+            if (statusCloseWrite == -1)
             {
                 printError("Error in close child - write Descriptor", __LINE__);
             }
 
             // redirect the stdin to the the read input of the pipe in order to write to the pipe
-            if (dup2(fd[M_READ], STDIN_FILENO) == -1)
+            int statusDupRead = dup2(fd[M_READ], STDIN_FILENO);
+            if (statusDupRead == -1)
             {
                 printError("Error in duplicating stdin", __LINE__);
             }
 
             // After redirection close the filedescriptor fd write
-            if (close(fd[M_READ]) == -1)
+            int statusCloseRead = close(fd[M_READ]);
+            if (statusCloseRead == -1)
             {
                 printError("Error in close child - read Descriptor", __LINE__);
             }
