@@ -178,7 +178,7 @@ extern FILE *mypopen(const char *command, const char *type)
             // Closing the pipes end if the fork process failed
             close(fd[M_READ]);
             close(fd[M_WRITE]);
-            return NULL;
+            return NULL; //break what for??----------------------------------------------------------------------------------------------------------------------
             break;
 
             // we are in the child process
