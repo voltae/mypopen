@@ -63,7 +63,7 @@ typedef struct childProcess
 {
     pid_t parentpid;
     pid_t childpid;
-    int fd;
+    int *fd;
     FILE *filepointer;
 } childProcess;
 
@@ -302,6 +302,8 @@ extern int mypclose(FILE *stream)
         return INVALID;
     }
 
+    close(actualProcess->fd[M_WRITE]);
+
     int status = 0;
     pid_t waitedChild;
 
@@ -370,7 +372,7 @@ static FILE *ParentPipeStream(int modus, int fd[])
 
             }
             // try to open a file stream to read the pipe
-            actualProcess->fd = fd[M_READ];
+            actualProcess->fd = fd;
             parentStream = fdopen(fd[M_READ], "r");
             if (parentStream == NULL)
             {
@@ -391,7 +393,7 @@ static FILE *ParentPipeStream(int modus, int fd[])
                 printf("read: %d, write: %d\n", fd[M_READ], fd[M_WRITE]);
             }
             // try to open a file stream to read the
-            actualProcess->fd = fd[M_WRITE];
+            actualProcess->fd = fd;
             parentStream = fdopen(fd[M_WRITE], "w");
             if (parentStream == NULL)
             {
@@ -400,6 +402,7 @@ static FILE *ParentPipeStream(int modus, int fd[])
                 printError("Error in write pipe", __LINE__);
                 return NULL;
             }
+
             break;
         }
 
@@ -412,7 +415,7 @@ static FILE *ParentPipeStream(int modus, int fd[])
     }
 
     // store the file descriptor for the current process
-    actualProcess->fd = *fd;
+    actualProcess->fd = fd;
 
     return parentStream;
 }
