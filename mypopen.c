@@ -88,7 +88,7 @@ static FILE *ParentPipeStream(int modus, int fd[]);
 
 void ChildPipeStream(int modus, int fd[]);
 
-
+void deallocateStruct(void);
 
 /*!
 * @brief Implementation of a simplifed popen() library function
@@ -127,7 +127,7 @@ static void printError(const char *errorMessage, int lineNumber)
 extern FILE *mypopen(const char *command, const char *type)
 {
     // set errno to 0 to capture the right error message
-    errno = 0;
+    // errno = 0;
 
     // if no actual process is allocated, allocate a new childprocess struct
     if (actualProcess == NULL)
@@ -242,9 +242,11 @@ extern FILE *mypopen(const char *command, const char *type)
 /// @returns the exit status of the wait system call
 extern int mypclose(FILE *stream)
 {
+
     // If mypclose is called without any actual process open
     if (stream == NULL && actualProcess == NULL)
     {
+        printf("Process called with Filepointer NULL and actualProcess NULL\n");
         errno = EINVAL;
         return INVALID;
     }
@@ -252,6 +254,7 @@ extern int mypclose(FILE *stream)
     else if (stream == NULL)
     {
         errno = ECHILD;
+        printf("Process called with Filepointer NULL\n");
         return INVALID;
     }
     // there is no child at all
@@ -263,15 +266,25 @@ extern int mypclose(FILE *stream)
     // Check if the incoming stream is created with mypopen
     if (stream != actualProcess->filepointer)
     {
+        printf("Process called with Filepointer different from actual Process\n");
         errno = EINVAL;
         return INVALID;
     }
     // close file Pointer
     if (fclose(stream) == EOF)
     {
+<<<<<<< HEAD
         //printError("Error in close file", __LINE__); ------------------------------------------------------------------------------------------auskommentiert
+=======
+        // set stream to NULL
+        stream = NULL;
+        printError("Error in close file", __LINE__);
+        deallocateStruct();
+>>>>>>> 648ec027ad5096286c797a63e26be9003fc32a2f
         return INVALID;
     }
+    // set the stream to NULL
+    stream = NULL;
 
     int status = 0;
     pid_t waitedChild;
@@ -282,6 +295,7 @@ extern int mypclose(FILE *stream)
         waitedChild = waitpid(actualProcess->childpid, &status, 0);
     } while (waitedChild == -1 && errno == EINTR); //check once more -----------------!!-----------------------------------------------------------------------
 
+<<<<<<< HEAD
     //printf("Exit status: %d\n", status); -----------------------------------------------------------------------------------------------------auskommentiert
     if (WIFEXITED(status))
     {
@@ -295,6 +309,38 @@ extern int mypclose(FILE *stream)
     free(actualProcess); //wenn du hier nochmal das selbe machst..wozu dann das if darüber? mach das doch einfach vorm if--------------------------------------
     actualProcess = NULL;
     stream = NULL;
+=======
+    } while (waitedChild == -1 && errno == EINTR);
+
+    printf("Exit true %d, Exit status: %d\n", WIFEXITED(status), WEXITSTATUS(status));
+
+    // deallocate the struct and set the pointer to NULL
+    deallocateStruct();
+
+    if (waitedChild == -1)
+    {
+        printf("waited Child is -1\n");
+        stream = NULL;
+        errno = ECHILD;
+        return INVALID;
+    }
+
+    printf("Before exiting\n");
+    if (WIFEXITED(status))
+    {
+        if (WEXITSTATUS(status) != 0)
+        {
+            errno = ECHILD;
+            printf("Set echild\n");
+        }
+        printf("True: %d Return status: %d\n", WIFEXITED(status), WEXITSTATUS(status));
+        return WEXITSTATUS(status);
+    }
+
+    /*if an error occured */
+    errno = ECHILD;
+    printf("14 should reach here\n");
+>>>>>>> 648ec027ad5096286c797a63e26be9003fc32a2f
     return INVALID;
 }
 
@@ -470,4 +516,11 @@ static isValid commandCheck(const char *command, const char *type)
     }
 
     return VALID;
+}
+
+void deallocateStruct(void)
+{
+    // deallocate the struct and set the pointer to NULL
+    free(actualProcess);
+    actualProcess = NULL;
 }
