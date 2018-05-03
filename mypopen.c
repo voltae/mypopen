@@ -315,7 +315,8 @@ extern int mypclose(FILE *stream)
     /* wait for terminating properly the child process */
     do
     {
-        waitedChild = waitpid(actualProcess->childpid, &status, WNOHANG);
+        // +++ cancelled WHNOHANG 
+        waitedChild = waitpid(actualProcess->childpid, &status, 0);
 
     } while (waitedChild == -1 && errno == EINTR);
 
