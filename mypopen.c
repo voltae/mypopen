@@ -131,7 +131,8 @@ extern FILE *mypopen(const char *command, const char *type)
     // if no actual process is allocated, allocate a new childprocess struct
     if (actualProcess == NULL)
     {
-        if ((actualProcess = malloc(sizeof(childProcess))) == NULL)
+		actualProcess = malloc(sizeof(childProcess)); // zuweisung davor --------------------------------------------------------------------------------------
+        if (actualProcess == NULL)
         {
             errno = ECHILD;
             return NULL;
@@ -310,7 +311,7 @@ extern int mypclose(FILE *stream)
     /* wait for terminating properly the child process */
     do
     {
-        waitedChild = waitpid(actualProcess->childpid, &status, 0);
+        waitedChild = waitpid(actualProcess->childpid, &status, WNOHANG);
 
     } while (waitedChild == -1 && errno == EINTR);
 
@@ -513,13 +514,11 @@ static isValid commandCheck(const char *command, const char *type)
     //first do the correct type check. type is only 1 element long and either 'w' or 'r'
     if ((type[0] != 'w' && type[0] != 'r') || type[1] != 0)
     {
-        printError("Type check wrong", __LINE__);
+        //printError("Type check wrong", __LINE__);----------------------------------------------------------------------------auskommentiert
         // set errno to invalid operation
         errno = EINVAL;
         return INVALID;
     }
 
     return VALID;
-
-
 }
