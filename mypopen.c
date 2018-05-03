@@ -61,7 +61,7 @@ typedef enum isValid
  */
 typedef struct childProcess
 {
-    pid_t parentpid;
+    pid_t parentpid; // blöde Frage aber wozu is die? wird nie verwendet ---------------------------------------------------------------------------------------
     pid_t childpid;
     int *fd;
     FILE *filepointer;
@@ -113,6 +113,7 @@ static void printError(const char *errorMessage, int lineNumber)
     {
         fprintf(stderr, "%d %s, errno: %d, errdescr: %s\n", lineNumber, errorMessage, errno, strerror(errno));
     }
+	// no return?---------------------------------------------------------------------------------------------------------------------------------
 }
 // TODO: delete this code after debugging.
 /*static void testingPrint(const char *testingMessage)
@@ -149,8 +150,8 @@ extern FILE *mypopen(const char *command, const char *type)
     // Check if the given arguments are valid
     if (commandCheck(command, type) == INVALID)
     {
-        errno = EINVAL;
-        fprintf(stderr, "Illegal input: %s", strerror(errno));
+        //errno = EINVAL; unnötig oder in commandCheck unnötig--------------------------------------------------------------------------------auskommentiert
+        //fprintf(stderr, "Illegal input: %s", strerror(errno)); //should be printed in stderr? ------------------------------------------------------auskommentiert
         return NULL;
     }
 
@@ -160,7 +161,7 @@ extern FILE *mypopen(const char *command, const char *type)
     // create a new pipe for the program with error checking
     if (pipe(fd) == -1)
     {
-        printError("Error in creating pipe", __LINE__);
+        //printError("Error in creating pipe", __LINE__); //should be printed in stderr?----------------------------------------------------------------auskommentiert
         errno = ECHILD;
         return NULL;
     }
@@ -203,10 +204,10 @@ extern FILE *mypopen(const char *command, const char *type)
             }
 
             // execute the current command.
-            execl(EXECPATH, EXECSHELL, EXECCOMM, command, (char *) NULL);
+            execl(EXECPATH, EXECSHELL, EXECCOMM, command, (char *) NULL); //das kann ich auf die schnelle ned kontrolliern --------------------------------------------
 
             // if we get to this point, ann error occurred,
-            printError("Error in execute line", __LINE__);
+            //printError("Error in execute line", __LINE__); keine andere Rückmeldung wenn es schiefgeht? ------------------------------------------------auskommentiert
             break;
         }
 
@@ -247,14 +248,14 @@ extern int mypclose(FILE *stream)
         errno = EINVAL;
         return INVALID;
     }
-        // There was called mypopen before, but no file pointer generated
+    // There was called mypopen before, but no file pointer generated
     else if (stream == NULL)
     {
         errno = ECHILD;
         return INVALID;
     }
     // there is no child at all
-    if (actualProcess == NULL)
+    if (actualProcess == NULL) //beides zusammenfassen mit ||? ----------------------------------------------------------------------------------------------
     {
         errno = ECHILD;
         return INVALID;
@@ -268,7 +269,7 @@ extern int mypclose(FILE *stream)
     // close file Pointer
     if (fclose(stream) == EOF)
     {
-        printError("Error in close file", __LINE__);
+        //printError("Error in close file", __LINE__); ------------------------------------------------------------------------------------------auskommentiert
         return INVALID;
     }
 
@@ -279,24 +280,20 @@ extern int mypclose(FILE *stream)
     do
     {
         waitedChild = waitpid(actualProcess->childpid, &status, 0);
+    } while (waitedChild == -1 && errno == EINTR); //check once more -----------------!!-----------------------------------------------------------------------
 
-    } while (waitedChild == -1 && errno == EINTR);
-
-    printf("Exit status: %d\n", status);
+    //printf("Exit status: %d\n", status); -----------------------------------------------------------------------------------------------------auskommentiert
     if (WIFEXITED(status))
     {
         // deallocate the struct
         free(actualProcess);
         actualProcess = NULL;
-
         stream = NULL;
-
-        return WEXITSTATUS(status);
+        return WEXITSTATUS(status); //so richtig? ------------------------------------------------------------------------------------------------------------
     }
     // deallocate the struct
-    free(actualProcess);
+    free(actualProcess); //wenn du hier nochmal das selbe machst..wozu dann das if darüber? mach das doch einfach vorm if--------------------------------------
     actualProcess = NULL;
-
     stream = NULL;
     return INVALID;
 }
@@ -310,8 +307,7 @@ extern int mypclose(FILE *stream)
 /// @error errno is set appropately
 static FILE *ParentPipeStream(int modus, int fd[])
 {
-    errno = 0;
-
+	errno = 0;
     FILE *parentStream = NULL;
     switch (modus)
     {
@@ -322,8 +318,7 @@ static FILE *ParentPipeStream(int modus, int fd[])
             int statusCloseWrite = close(fd[M_WRITE]);
             if (statusCloseWrite == -1)
             {
-                printError("Error in close write Descriptor", __LINE__);
-
+                //printError("Error in close write Descriptor", __LINE__); keine andere Rückmeldung wenn es schiefgeht? ---------------auskommentiert
             }
             // try to open a file stream to read the pipe
             actualProcess->fd = fd;
@@ -332,8 +327,9 @@ static FILE *ParentPipeStream(int modus, int fd[])
             {
                 // close the read end of the parents pipe
                 close(fd[M_READ]);
-                printError("Error in read pipe", __LINE__);
-                return NULL;
+                //printError("Error in read pipe", __LINE__); -------------------------------------------------------------------------auskommentiert
+				//keine Rückmeldung für close -------------------------------------------------------------------------------------------------------
+                return NULL; //unnötig weil sowieso mit return parentStream NULL returnt würde wenn parentStream == NULL ----------------------------
             }
             break;
         }
@@ -343,8 +339,8 @@ static FILE *ParentPipeStream(int modus, int fd[])
             int statusCloseRead = close(fd[M_READ]);
             if (statusCloseRead == -1)
             {
-                printError("Error in close read Descriptor", __LINE__);
-                printf("read: %d, write: %d\n", fd[M_READ], fd[M_WRITE]);
+                //printError("Error in close read Descriptor", __LINE__); keine andere Rückmeldung wenn es schiefgeht? ---------------auskommentiert
+                //printf("read: %d, write: %d\n", fd[M_READ], fd[M_WRITE]); ----------------------------------------------------------auskommentiert
             }
             // try to open a file stream to read the
             actualProcess->fd = fd;
@@ -353,10 +349,10 @@ static FILE *ParentPipeStream(int modus, int fd[])
             {
                 // close writes end of the parents pipe
                 close(fd[M_WRITE]);
-                printError("Error in write pipe", __LINE__);
-                return NULL;
+                //printError("Error in write pipe", __LINE__); -----------------------------------------------------------------------auskommentiert
+				// keine Rückmeldung wenn close schiefgeht------------------------------------------------------------------------------------------
+                return NULL; // unnötig wenn parentStream == NULL ----------------------------------------------------------------------------------
             }
-
             break;
         }
 
@@ -369,8 +365,7 @@ static FILE *ParentPipeStream(int modus, int fd[])
     }
 
     // store the file descriptor for the current process
-    actualProcess->fd = fd;
-
+    actualProcess->fd = fd; //--> du machst das selbe in jedem einzelnen case schonmal ----------------------------------------------------------------
     return parentStream;
 }
 
@@ -390,25 +385,25 @@ void ChildPipeStream(int modus, int fd[])
             int statusCloseRead = close(fd[M_READ]);
             if (statusCloseRead == -1)
             {
-                printError("Error in close read Descriptor", __LINE__);
+                //printError("Error in close read Descriptor", __LINE__); keine andere Rükmeldung wenn es schiefgeht?----------------------auskommentiert
             }
 
             // Redirect the stdout to the pipe in order to read from pipe and check error
-            if (fd[M_WRITE] != STDOUT_FILENO)
+            if (fd[M_WRITE] != STDOUT_FILENO) //wieso sollte es schon dort liegen? -------------------------------------------------------------------------
             {
                 int statusDupWrite = dup2(fd[M_WRITE], STDOUT_FILENO);
                 if (statusDupWrite == -1)
                 {
                     // close the childs write pipe end in chase the dup failed.
-                    close(M_WRITE);
-                    printError("Error in duplicating stout", __LINE__);
+                    close(M_WRITE); //wieso schließt dus nur bei einem FAIL? ------------------------------------------------------------------------------
+                    //printError("Error in duplicating stout", __LINE__); -------------------------------------------------------------------auskommentiert
                 }
             }
             // After redirection close the filedescriptor fd write
             int statusCloseWrite = close(fd[M_WRITE]);
             if (statusCloseWrite == -1)
             {
-                printError("Error in close child -write Descriptor", __LINE__);
+                //printError("Error in close child -write Descriptor", __LINE__); keine andere Rückmeldung wenn es schiefgeht? ---------------auskommentiert
             }
             break;
         }
@@ -418,7 +413,7 @@ void ChildPipeStream(int modus, int fd[])
             int statusCloseWrite = close(fd[M_WRITE]);
             if (statusCloseWrite == -1)
             {
-                printError("Error in close child - write Descriptor", __LINE__);
+                //printError("Error in close child - write Descriptor", __LINE__); keine andere Rückmeldung wenn es schiefgeht? ---------------auskommentiert
             }
 
             // redirect the stdin to the the read input of the pipe in order to write to the pipe
@@ -428,15 +423,16 @@ void ChildPipeStream(int modus, int fd[])
                 if (statusDupRead == -1)
                 {
                     // close the childs read pipe end in chase the dup failed.
-                    close(M_READ);
-                    printError("Error in duplicating stdin", __LINE__);
+                    close(M_READ); // wieso schließt dus nur bei einem FAIL? ------------------------------------------------------------------------------
+									//btw kein error von close gecheckt?----------------------------------------------------------------------------------
+                    //printError("Error in duplicating stdin", __LINE__); --------------------------------------------------------------------auskommentiert
                 }
             }
             // After redirection close the filedescriptor fd write
             int statusCloseRead = close(fd[M_READ]);
             if (statusCloseRead == -1)
             {
-                printError("Error in close child - read Descriptor", __LINE__);
+                //printError("Error in close child - read Descriptor", __LINE__); keine andere Rückmeldung wenn es schiefgeht? ---------------auskommentiert
             }
             break;
         }
