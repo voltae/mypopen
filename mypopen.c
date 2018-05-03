@@ -131,7 +131,8 @@ extern FILE *mypopen(const char *command, const char *type)
     // if no actual process is allocated, allocate a new childprocess struct
     if (actualProcess == NULL)
     {
-		actualProcess = malloc(sizeof(childProcess)); // zuweisung davor --------------------------------------------------------------------------------------
+        actualProcess = malloc(
+                sizeof(childProcess)); // zuweisung davor --------------------------------------------------------------------------------------
         if (actualProcess == NULL)
         {
             errno = ECHILD;
@@ -227,47 +228,9 @@ extern FILE *mypopen(const char *command, const char *type)
                 assert(0);
             }
             break;
-
-
         }
-
-    }
-    // Commenting out waiting for pid in parent process for testing reasons
-    /*// capture the wait state only for debugging
-    int status;
-    pid_t childPid = waitpid(actualProcess->childpid, &status, WNOHANG);
-    if (childPid == -1)
-    {
-        printError("Exit failed", __LINE__);
-        return NULL;
     }
 
-    if (WIFEXITED(status))
-    {
-        // return file stream only if the child terminated properly
-        if (WEXITSTATUS(status) == EXIT_SUCCESS)
-        {
-            // Storing the filepointer in the actual child struct
-
-            actualProcess->filepointer = fp_parent_process;
-            fprintf(stdout, "file pointer: %p\n", (void *)fp_parent_process);
-            return fp_parent_process;
-        }
-        else if (WEXITSTATUS(status) == EXIT_FAILURE)
-        {
-            printf("Terminated with error: %d, %s", errno, strerror(errno));
-            //exit(EXIT_FAILURE);
-        }
-        else if (WIFSTOPPED(status))
-        {
-            printf("stopped by signal %d\n", WSTOPSIG(status));
-        }
-        else if (WIFCONTINUED(status))
-        {
-            printf("continued\n");
-        }
-
-    }*/
     // Storing the filepointer in the actual child struct
     actualProcess->filepointer = fp_parent_process;
     return fp_parent_process;
@@ -315,7 +278,6 @@ extern int mypclose(FILE *stream)
     /* wait for terminating properly the child process */
     do
     {
-        // +++ cancelled WHNOHANG 
         waitedChild = waitpid(actualProcess->childpid, &status, 0);
 
     } while (waitedChild == -1 && errno == EINTR);
@@ -334,13 +296,6 @@ extern int mypclose(FILE *stream)
     // deallocate the struct
     free(actualProcess);
     actualProcess = NULL;
-
-    // close file Pointer
-    if (fclose(stream) == EOF)
-    {
-        printError("Error in close file", __LINE__);
-        return INVALID;
-    }
 
     stream = NULL;
     return INVALID;
