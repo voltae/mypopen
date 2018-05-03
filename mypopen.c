@@ -301,8 +301,12 @@ extern int mypclose(FILE *stream)
         errno = EINVAL;
         return INVALID;
     }
-
-    close(actualProcess->fd[M_WRITE]);
+    // close file Pointer
+    if (fclose(stream) == EOF)
+    {
+        printError("Error in close file", __LINE__);
+        return INVALID;
+    }
 
     int status = 0;
     pid_t waitedChild;
@@ -320,13 +324,6 @@ extern int mypclose(FILE *stream)
         // deallocate the struct
         free(actualProcess);
         actualProcess = NULL;
-
-        // close file Pointer
-        if (fclose(stream) == EOF)
-        {
-            printError("Error in close file", __LINE__);
-            return INVALID;
-        }
 
         stream = NULL;
 
