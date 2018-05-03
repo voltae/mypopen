@@ -3,12 +3,21 @@
 ## done
 
 * header file
-## todo
 * implementing the test suite wit the current code
-* sollen wir ein neues file erstellen mit den implementation der richtigen funktionen, oder die funktionen in ein anderes testing file auslager?
+* system meldet __broken pipe__ wenn Schreibprozess. (Child process im falschen mode aufgerufen)
+## todo
+Delete the wait for chil routine in the parent process, it seems to work without it.
+
 
 ## issues
-
+Test fail on
+* 10
+* 12
+* 13
+* 14
+* 17
+* 22
+* 23
 ### mypopen()
 * mypopen() muß zunächst eine Pipe einrichten (pipe(2)) 
 * dann einen Kindprozeß generieren (fork(2)). 
