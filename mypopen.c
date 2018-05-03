@@ -304,31 +304,32 @@ extern int mypclose(FILE *stream)
 
     int status = 0;
     pid_t waitedChild;
-   
 
     /* wait for terminating properly the child process */
     do
     {
-        pid_t childPid = waitpid(actualProcess->childpid, &status, WNOHANG | WUNTRACED | WCONTINUED);
-        // check if wait returns the pid
-        if (childPid == -1)
+        waitedChild = waitpid(actualProcess->childpid, &status, 0);
+
+    } while (waitedChild == -1 && errno == EINTR);
+
+    printf("Exit status: %d\n", status);
+    if (WIFEXITED(status))
+    {
+        // deallocate the struct
+        free(actualProcess);
+        actualProcess = NULL;
+
+        // close file Pointer
+        if (fclose(stream) == EOF)
         {
-            perror("waitpid");
-            fprintf(stderr, "Error in waiting for child: %s", strerror(errno));
-            return status;
+            printError("Error in close file", __LINE__);
+            return INVALID;
         }
 
-        if (WIFSIGNALED(status))
-        {
-            return WTERMSIG(status);
-        }
-        else if (WIFSTOPPED(status))
-        {
-            return WSTOPSIG(status);
-        }
+        stream = NULL;
 
-    } while (!WIFEXITED(status) && !WIFSIGNALED(status));
-
+        return WEXITSTATUS(status);
+    }
     // deallocate the struct
     free(actualProcess);
     actualProcess = NULL;
@@ -341,12 +342,6 @@ extern int mypclose(FILE *stream)
     }
 
     stream = NULL;
-    // If the exit status is normal, return the status
-    if (WIFEXITED(status))
-    {
-        return WEXITSTATUS(status);
-    }
-
     return INVALID;
 }
 
@@ -379,6 +374,8 @@ static FILE *ParentPipeStream(int modus, int fd[])
             parentStream = fdopen(fd[M_READ], "r");
             if (parentStream == NULL)
             {
+                // close the read end of the parents pipe
+                close(fd[M_READ]);
                 printError("Error in read pipe", __LINE__);
                 return NULL;
             }
@@ -398,6 +395,8 @@ static FILE *ParentPipeStream(int modus, int fd[])
             parentStream = fdopen(fd[M_WRITE], "w");
             if (parentStream == NULL)
             {
+                // close writes end of the parents pipe
+                close(fd[M_WRITE]);
                 printError("Error in write pipe", __LINE__);
                 return NULL;
             }
@@ -443,6 +442,8 @@ void ChildPipeStream(int modus, int fd[])
                 int statusDupWrite = dup2(fd[M_WRITE], STDOUT_FILENO);
                 if (statusDupWrite == -1)
                 {
+                    // close the childs write pipe end in chase the dup failed.
+                    close(M_WRITE);
                     printError("Error in duplicating stout", __LINE__);
                 }
             }
@@ -469,6 +470,8 @@ void ChildPipeStream(int modus, int fd[])
                 int statusDupRead = dup2(fd[M_READ], STDIN_FILENO);
                 if (statusDupRead == -1)
                 {
+                    // close the childs read pipe end in chase the dup failed.
+                    close(M_READ);
                     printError("Error in duplicating stdin", __LINE__);
                 }
             }
