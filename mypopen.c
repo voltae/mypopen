@@ -133,7 +133,7 @@ extern FILE *mypopen(const char *command, const char *type)
     {
         if ((actualProcess = malloc(sizeof(childProcess))) == NULL)
         {
-            errno = ENOMEM;
+            errno = ECHILD;
             return NULL;
         }
     }
@@ -142,9 +142,6 @@ extern FILE *mypopen(const char *command, const char *type)
     if (actualProcess->filepointer != NULL)
     {
         errno = EAGAIN;
-        printError("A process is running", __LINE__);
-        printf("Error number: %d\n", errno);
-
         return NULL;
     }
     // Check if the given arguments are valid
@@ -280,10 +277,16 @@ extern FILE *mypopen(const char *command, const char *type)
 /// @returns the exit status of the wait system call
 extern int mypclose(FILE *stream)
 {
-    fflush(stream);
-    if (stream == NULL)
+    // If mypclose is called without any actual process open
+    if (stream == NULL && actualProcess == NULL)
     {
         errno = EINVAL;
+        return INVALID;
+    }
+        // There was called mypopen before, but no file pointer generated
+    else if (stream == NULL)
+    {
+        errno = ECHILD;
         return INVALID;
     }
     // there is no child at all
@@ -292,22 +295,16 @@ extern int mypclose(FILE *stream)
         errno = ECHILD;
         return INVALID;
     }
-
     // Check if the incoming stream is created with mypopen
     if (stream != actualProcess->filepointer)
     {
-        printError("Wrong stream to close", __LINE__);
         errno = EINVAL;
-
-        // if another process is open, close that instead
-        if (actualProcess->filepointer)
-        {
-            printError("Open another process instead", __LINE__);
-        }
         return INVALID;
     }
 
     int status = 0;
+    pid_t waitedChild;
+   
 
     /* wait for terminating properly the child process */
     do
@@ -318,24 +315,18 @@ extern int mypclose(FILE *stream)
         {
             perror("waitpid");
             fprintf(stderr, "Error in waiting for child: %s", strerror(errno));
-            return INVALID;
+            return status;
         }
 
         if (WIFSIGNALED(status))
         {
-            printf("killed by signal %d\n", WTERMSIG(status));
-            return INVALID;
+            return WTERMSIG(status);
         }
         else if (WIFSTOPPED(status))
         {
-            printf("stopped by signal %d\n", WSTOPSIG(status));
-            return INVALID;
+            return WSTOPSIG(status);
         }
-        else if (WIFCONTINUED(status))
-        {
-            printf("continued\n");
-            return INVALID;
-        }
+
     } while (!WIFEXITED(status) && !WIFSIGNALED(status));
 
     // deallocate the struct
@@ -350,7 +341,13 @@ extern int mypclose(FILE *stream)
     }
 
     stream = NULL;
-    return VALID;
+    // If the exit status is normal, return the status
+    if (WIFEXITED(status))
+    {
+        return WEXITSTATUS(status);
+    }
+
+    return INVALID;
 }
 
 /// @brief configure the parent process
