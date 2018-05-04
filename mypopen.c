@@ -1,16 +1,17 @@
-//*
-// @file mypopen.c
-// Betriebssysteme mypopen/mypclose File.
-// Beispiel 2
-//
-// @author Valentin Platzgummer <ic17b096@technikum-wien.at>
-// @author Lara Kammerer <ic17b001@technikum-wien.at>
-// @date 2018/04/23
-//
-// @version 1
-//
 /*!
- * @brief        The mypopen() function opens a process by creating a pipe, forking, and
+* @file mypopen.c
+* Betriebssysteme mypopen/mypclose File.
+* Beispiel 2
+*
+* @author Valentin Platzgummer <ic17b096@technikum-wien.at>
+* @author Lara Kammerer <ic17b001@technikum-wien.at>
+* @date 2018/04/23
+*
+* @version 1.5
+*/
+
+/*!
+ * @brief The mypopen() function opens a process by creating a pipe, forking, and
        invoking the shell.  Since a pipe is by definition unidirectional,
    @param type the argument may specify only reading or writing, not both; the
        resulting stream is correspondingly read-only or write-only.
@@ -152,7 +153,7 @@ extern FILE *mypopen(const char *command, const char *type)
             close(fd[M_WRITE]);
             errno = err;
             return NULL;
-            break;
+            break; // we now this break is unnecessary, but this is defensive (italian) style
         }
 
             // we are in the child process
@@ -179,7 +180,7 @@ extern FILE *mypopen(const char *command, const char *type)
 
             // if we get to this point, an error occurred,
             _exit(EXIT_FAILURE);
-            break;
+            break;  // we now this break is unnecessary, but this is defensive (italian) style
         }
 
             // we are in the parent process
@@ -247,7 +248,6 @@ extern int mypclose(FILE *stream)
     /* Reset all global variables for the next process*/
     childpid = -1;
     filepointer = NULL;
-
 
     if (waitedChild == -1) // errno is set by widpid
     {

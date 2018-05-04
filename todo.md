@@ -6,7 +6,7 @@
 * implementing the test suite wit the current code
 * system signaled __broken pipe__ in write process. This was due the child routine was called in the wrong mode. the write descriptor of the child was close, but it had to write.
 * Delete the wait for child routine in the parent process, it seems to work without it. int them mypclose routine close fist the filestream and wait then for the child. This forces the child process to terminate.
-* If fork fails it must _exit(EXIT_FAILURE) ont another errorcode. In our case this was _exit(127).
+* If fork fails it must _exit(EXIT_FAILURE) not another errorcode. In our case this was _exit(127).
 * if the file descriptor of the child process is already the same as the STDOUT_FILENO, it cannot close this file descriptor. This call was outside of the if clause, so it was called, even do it was the same.
 * int the mypclose routine first is to check whether the parameter are correct:
     * the incoming file stream must exist.
@@ -15,7 +15,7 @@
 ### mypopen()
 * the function works with two file-global (static) variables:
     * a filepointer, that stores the current filestream
-    * a pid_t integer tat stores the process number of the child process.
+    * a pid_t integer that stores the process number of the child process.
 
 myopen creates first does a series of error checks. 
 * first does a filepointer and therefore a current process exist, -> YES terminate the program with errno = EAGAIN. It should run only one child proces at a time.
