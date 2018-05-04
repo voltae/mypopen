@@ -1,23 +1,56 @@
 # mypopen
 
 ## done
-
+* All Tests pass
 * header file
 * implementing the test suite wit the current code
-* system meldet __broken pipe__ wenn Schreibprozess. (Child process im falschen mode aufgerufen)
-## todo
-Delete the wait for chil routine in the parent process, it seems to work without it.
+* system signaled __broken pipe__ in write process. This was due the child routine was called in the wrong mode. the write descriptor of the child was close, but it had to write.
+* Delete the wait for child routine in the parent process, it seems to work without it. int them mypclose routine close fist the filestream and wait then for the child. This forces the child process to terminate.
+* If fork fails it must _exit(EXIT_FAILURE) ont another errorcode. In our case this was _exit(127).
+* if the file descriptor of the child process is already the same as the STDOUT_FILENO, it cannot close this file descriptor. This call was outside of the if clause, so it was called, even do it was the same.
+* int the mypclose routine first is to check whether the parameter are correct:
+    * the incoming file stream must exist.
+    * the incoming file stream must be match with the stored one, i.e must be created with mypopen.
+## memo
+### mypopen()
+* the function works with two file-global (static) variables:
+    * a filepointer, that stores the current filestream
+    * a pid_t integer tat stores the process number of the child process.
 
+myopen creates first does a series of error checks. 
+* first does a filepointer and therefore a current process exist, -> YES terminate the program with errno = EAGAIN. It should run only one child proces at a time.
+* are the parameter correct?
+* create a pipe, and check if the call was successful.
+* fork the parent process and distinguish between three cases, from the return value:
+   1. the fork failed. close the pipe, set the errno accordingly and return NULL.
+   2. the pid is 0, means we are in the child process
+   3. the pid greater than 0, we are in the parent process.
+     
+   in the child process:
+   distinguish between two cases. either pipe read or pipe write. (it is seen from parents perspective)
+   * close the opposit file descriptor, close()
+   * duplicate the open file descriptor to either STDOUT if reading or STDIN if writing, to connect the pipe with the shell. dup2()
+   * close the not used filedescriptor.
+   * execute the command with execl
+   
+   in the parent process:
+   * close the not used pipe ends (file descriptors). In case reading, the writing end and viceversa
+   * create a file stream for either reading or writing with the filedesscriptor, fopen()
+   * return the created file stream.
+   
+### mypclose()
+   * error check for the incoming parameters. As described above.
+   * important close the incoming filestream before waiting for the child to terminate, if the child is waiting for input. It snds a EOF to the file, that signalizes the child to terminate. 
+   * wait for the child in a loop, the loop is not busy waiting.
+   * if waiting failed, return -1 in the other case return the eit status of the hild process. 
+
+
+## todo
+all done
 
 ## issues
-Test fail on
-* 10
-* 12
-* 13
-* 14
-* 17
-* 22
-* 23
+no Tests fail
+
 ### mypopen()
 * mypopen() muß zunächst eine Pipe einrichten (pipe(2)) 
 * dann einen Kindprozeß generieren (fork(2)). 
