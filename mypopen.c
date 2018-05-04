@@ -1,7 +1,7 @@
 //*
 // @file mypopen
 // Betriebssysteme mypopen/mypclose File.
-// Beispiel 0
+// Beispiel 2
 //
 // @author Valentin Platzgummer <ic17b096@technikum-wien.at>
 // @author Lara Kammerer <ic17b001@technikum-wien.at>
@@ -17,18 +17,6 @@
 
 // -------------------------------------------------------------- includes --
 
-#include <errno.h>  // for errno
-#include <error.h>
-#include <stdio.h>
-#include <stdlib.h>  // for exit()
-#include <string.h>
-#include <unistd.h> // for fork()
-#include <sys/types.h> // for getpid() and getppid()
-#include <sys/wait.h> // for waitpid
-#include <unistd.h>
-#include <fcntl.h> // for open
-#include <assert.h> // for assert
-#include <sys/stat.h>
 #include "mypopen.h"
 
 
@@ -59,22 +47,24 @@ typedef enum isValid
 /*!
  * @brief structure to hold the pid and the file descriptor of the actual child process
  */
-typedef struct childProcess
+/*typedef struct childProcess
 {
     pid_t parentpid; // bl�de Frage aber wozu is die? wird nie verwendet ---------------------------------------------------------------------------------------
     pid_t childpid;
     int *fd;
     FILE *filepointer;
-} childProcess;
+} childProcess;*/
 
 // --------------------------------------------------------------- globals --
 
-/// @var pid process id number for the current child process, needed because mypclose need to wait for this process
-//static pid_t pid = -1;
+/*! @var pid process id number for the current child process, needed because mypclose need to wait for this process */
+static pid_t childpid = -1;
+
 /*!
- * @brief pointer to the structure to check if child exists or not
+ * @brief local varialbe points to the current open filestream
  */
-static childProcess *actualProcess;
+static FILE *filepointer = NULL;
+
 // ------------------------------------------------------------- functions --
 
 static void printError(const char *errorMessage, int lineNumber);
@@ -86,9 +76,7 @@ static isValid commandCheck(const char *command, const char *type);
 
 static FILE *ParentPipeStream(int modus, int fd[]);
 
-void ChildPipeStream(int modus, int fd[]);
-
-void deallocateStruct(void);
+static void ChildPipeStream(int modus, int fd[]);
 
 /*!
 * @brief Implementation of a simplifed popen() library function
@@ -126,27 +114,17 @@ static void printError(const char *errorMessage, int lineNumber)
 /// @param type The type argument is a pointer to a null-terminated string  which  must  contain either the letter 'r' for reading or the letter 'w' for writing.
 extern FILE *mypopen(const char *command, const char *type)
 {
-    // set errno to 0 to capture the right error message
-    // errno = 0;
 
-    // if no actual process is allocated, allocate a new childprocess struct
-    if (actualProcess == NULL)
-    {
-        actualProcess = malloc(
-                sizeof(childProcess)); // zuweisung davor --------------------------------------------------------------------------------------
-        if (actualProcess == NULL)
-        {
-            errno = ECHILD;
-            return NULL;
-        }
-    }
+    // define an array for the file-descriptors of the pipe
+    int fd[2];
 
-    // check if a process is running by asking the pid if is not 0
-    if (actualProcess->filepointer != NULL)
+    // a filepointer exists, means there is a current process running
+    if (filepointer != NULL)
     {
         errno = EAGAIN;
         return NULL;
     }
+
     // Check if the given arguments are valid
     if (commandCheck(command, type) == INVALID)
     {
@@ -155,8 +133,8 @@ extern FILE *mypopen(const char *command, const char *type)
         return NULL;
     }
 
-    // define an array for the file-descriptors of the pipe
-    int fd[2];
+    // set errno to 0 to capture the right error message
+    errno = 0;
 
     // create a new pipe for the program with error checking
     if (pipe(fd) == -1)
@@ -166,21 +144,19 @@ extern FILE *mypopen(const char *command, const char *type)
         return NULL;
     }
 
-    // Define the Filepointer for the parent process
-    FILE *fp_parent_process = NULL;
-
     // fork the current process. It should always be open only one pipe
-    pid_t pid = actualProcess->childpid = fork();
-    // store the parent pid of the current process,
-    actualProcess->parentpid = getppid();
+    childpid = fork();
 
-    switch (pid)
+    switch (childpid)
     {
         case -1:
             printError("Error in fork process", __LINE__);
+            // store errno local to not get overwritten by close
+            const int err = errno;
             // Closing the pipes end if the fork process failed
             close(fd[M_READ]);
             close(fd[M_WRITE]);
+            errno = err;
             return NULL; //break what for??----------------------------------------------------------------------------------------------------------------------
             break;
 
@@ -207,8 +183,8 @@ extern FILE *mypopen(const char *command, const char *type)
             execl(EXECPATH, EXECSHELL, EXECCOMM, command,
                   (char *) NULL); //das kann ich auf die schnelle ned kontrolliern --------------------------------------------
 
-            // if we get to this point, ann error occurred,
-            //printError("Error in execute line", __LINE__); keine andere R�ckmeldung wenn es schiefgeht? ------------------------------------------------auskommentiert
+            // if we get to this point, an error occurred,
+            _exit(127);
             break;
         }
 
@@ -218,11 +194,11 @@ extern FILE *mypopen(const char *command, const char *type)
             // if type is "r" the pipe is in read modus from parents perspective
             if (type[0] == 'r')
             {
-                fp_parent_process = ParentPipeStream(M_READ, fd);
+                filepointer = ParentPipeStream(M_READ, fd);
             }
             else if (type[0] == 'w')
             {
-                fp_parent_process = ParentPipeStream(M_WRITE, fd);
+                filepointer = ParentPipeStream(M_WRITE, fd);
             }
                 // default path, should not happen
             else
@@ -233,10 +209,7 @@ extern FILE *mypopen(const char *command, const char *type)
         }
     }
 
-    // Storing the filepointer in the actual child struct
-    actualProcess->filepointer = fp_parent_process;
-    return fp_parent_process;
-    //return NULL;
+    return filepointer;
 }
 
 /// @brief The pclose() function waits for the associated process to terminate and returns the exit status of the command as returned by wait4(2).
@@ -244,38 +217,30 @@ extern FILE *mypopen(const char *command, const char *type)
 extern int mypclose(FILE *stream)
 {
 
-    // If mypclose is called without any actual process open
-    if (stream == NULL && actualProcess == NULL)
-    {
-        printf("Process called with Filepointer NULL and actualProcess NULL\n");
-        errno = EINVAL;
-        return INVALID;
-    }
-        // There was called mypopen before, but no file pointer generated
-    else if ((stream == NULL) || (actualProcess == NULL))
+    // If mypclose is called without any actual child open
+    if (filepointer == NULL)
     {
         errno = ECHILD;
-        printf("Process called with Filepointer NULL\n");
         return INVALID;
     }
-    // Check if the incoming stream is created with mypopen
-    if (stream != actualProcess->filepointer)
+
+    // Check if the incoming stream is created with mypopen, if stream is NULL it fails either
+    if (stream != filepointer)
     {
-        printf("Process called with Filepointer different from actual Process\n");
         errno = EINVAL;
         return INVALID;
     }
-    // close file Pointer
+    // close file Pointer, and terminate the child process
     if (fclose(stream) == EOF)
     {
         // set stream to NULL
         stream = NULL;
+        // reset global variables filepointer and childpid
+        filepointer = NULL;
+        childpid = -1;
         printError("Error in close file", __LINE__);
-        deallocateStruct();
         return INVALID;
     }
-    // set the stream to NULL
-    stream = NULL;
 
     int status = 0;
     pid_t waitedChild;
@@ -283,21 +248,22 @@ extern int mypclose(FILE *stream)
     /* wait for terminating properly the child process */
     do
     {
-        waitedChild = waitpid(actualProcess->childpid, &status, 0);
+        waitedChild = waitpid(childpid, &status, 0);
     } while (waitedChild == -1 && errno ==
                                   EINTR); //check once more -----------------!!-----------------------------------------------------------------------
 
     //printf("Exit status: %d\n", status); -----------------------------------------------------------------------------------------------------auskommentiert
     if (WIFEXITED(status))
     {
-        // deallocate the struct
-        deallocateStruct();
+        /* reset the global varaibles and return the exit value */
         stream = NULL;
+        childpid = -1;
+        filepointer = NULL;
         return WEXITSTATUS(status); //so richtig? ------------------------------------------------------------------------------------------------------------
     }
-    // deallocate the struct
-    free(actualProcess); //wenn du hier nochmal das selbe machst..wozu dann das if dar�ber? mach das doch einfach vorm if--------------------------------------
-    actualProcess = NULL;
+
+    childpid = -1;
+    filepointer = NULL;
     stream = NULL;
 
 
@@ -305,43 +271,20 @@ extern int mypclose(FILE *stream)
            WIFEXITED(status), WEXITSTATUS(status)
     );
 
-// deallocate the struct and set the pointer to NULL
-    deallocateStruct();
 
     if (waitedChild == -1)
     {
         printf("waited Child is -1\n");
         stream = NULL;
         errno = ECHILD;
-        return
-                INVALID;
-    }
-
-    printf("Before exiting\n");
-    if (
-            WIFEXITED(status)
-            )
-    {
-        if (
-                WEXITSTATUS(status)
-                != 0)
-        {
-            errno = ECHILD;
-            printf("Set echild\n");
-        }
-        printf("True: %d Return status: %d\n",
-               WIFEXITED(status), WEXITSTATUS(status)
-        );
-        return
-                WEXITSTATUS(status);
+        return INVALID;
     }
 
 /*if an error occured */
     errno = ECHILD;
     printf("14 should reach here\n");
 
-    return
-            INVALID;
+    return INVALID;
 }
 
 /// @brief configure the parent process
@@ -367,7 +310,6 @@ static FILE *ParentPipeStream(int modus, int fd[])
                 //printError("Error in close write Descriptor", __LINE__); keine andere R�ckmeldung wenn es schiefgeht? ---------------auskommentiert
             }
             // try to open a file stream to read the pipe
-            actualProcess->fd = fd;
             parentStream = fdopen(fd[M_READ], "r");
             if (parentStream == NULL)
             {
@@ -389,7 +331,6 @@ static FILE *ParentPipeStream(int modus, int fd[])
                 //printf("read: %d, write: %d\n", fd[M_READ], fd[M_WRITE]); ----------------------------------------------------------auskommentiert
             }
             // try to open a file stream to read the
-            actualProcess->fd = fd;
             parentStream = fdopen(fd[M_WRITE], "w");
             if (parentStream == NULL)
             {
@@ -410,8 +351,6 @@ static FILE *ParentPipeStream(int modus, int fd[])
         }
     }
 
-    // store the file descriptor for the current process
-    actualProcess->fd = fd; //--> du machst das selbe in jedem einzelnen case schonmal ----------------------------------------------------------------
     return parentStream;
 }
 
@@ -428,40 +367,31 @@ void ChildPipeStream(int modus, int fd[])
         case M_READ:
         {
             // pipe is in write mode from childs perspective
-            int statusCloseRead = close(fd[M_READ]);
-            if (statusCloseRead == -1)
-            {
-                //printError("Error in close read Descriptor", __LINE__); keine andere R�kmeldung wenn es schiefgeht?----------------------auskommentiert
-            }
+            (void) close(fd[M_READ]); // errno get set by close
 
             // Redirect the stdout to the pipe in order to read from pipe and check error
             if (fd[M_WRITE] !=
-                STDOUT_FILENO) //wieso sollte es schon dort liegen? -------------------------------------------------------------------------
+                STDOUT_FILENO) //wieso sollte es schon dort liegen? ----------------------------------------------------------VP Defensiv-
             {
                 int statusDupWrite = dup2(fd[M_WRITE], STDOUT_FILENO);
                 if (statusDupWrite == -1)
                 {
                     // close the childs write pipe end in chase the dup failed.
-                    close(M_WRITE); //wieso schlie�t dus nur bei einem FAIL? ------------------------------------------------------------------------------
+                    (void) close(
+                            M_WRITE); //wieso schlie�t dus nur bei einem FAIL? ------------------------------------Bei Fail schließe ich die komplette Pipe---
                     //printError("Error in duplicating stout", __LINE__); -------------------------------------------------------------------auskommentiert
                 }
             }
-            // After redirection close the filedescriptor fd write
-            int statusCloseWrite = close(fd[M_WRITE]);
-            if (statusCloseWrite == -1)
-            {
-                //printError("Error in close child -write Descriptor", __LINE__); keine andere R�ckmeldung wenn es schiefgeht? ---------------auskommentiert
-            }
+            // After redirection close the filedescriptor fd write, errno get set by close
+            (void) close(fd[M_WRITE]);
+
             break;
         }
         case M_WRITE:
         {
             // pipe is in read mode from childs perspective
-            int statusCloseWrite = close(fd[M_WRITE]);
-            if (statusCloseWrite == -1)
-            {
-                //printError("Error in close child - write Descriptor", __LINE__); keine andere R�ckmeldung wenn es schiefgeht? ---------------auskommentiert
-            }
+            (void) close(fd[M_WRITE]); // errno get set by close
+
 
             // redirect the stdin to the the read input of the pipe in order to write to the pipe
             if (fd[M_READ] != STDIN_FILENO)
@@ -517,11 +447,4 @@ static isValid commandCheck(const char *command, const char *type)
     }
 
     return VALID;
-}
-
-void deallocateStruct(void)
-{
-    // deallocate the struct and set the pointer to NULL
-    free(actualProcess);
-    actualProcess = NULL;
 }

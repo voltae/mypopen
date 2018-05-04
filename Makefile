@@ -30,7 +30,7 @@ test: $(OBJ)
         #./popentest
 # link against the dynamic test suite test-pipe
 test-pipe: $(OBJ)
-	$(CC) -o$(TESTPIPE) $(OBJ) $(LIB_PIPE)    $(LIB_PATH_PIPE)
+	$(CC) -o$(TESTPIPE) $(OBJ) $(LIB_PIPE) $(LIB_PATH_PIPE)
 	    # to run command directly
 	    #./test-pipe
 
