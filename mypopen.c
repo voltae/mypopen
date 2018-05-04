@@ -19,10 +19,7 @@
 
 #include "mypopen.h"
 
-
 // --------------------------------------------------------------- defines --
-/// @def max define the buffer for the file reading process
-#define BUFFERSIZE 256      // For read and write files
 /// @def path to the execution shell
 #define EXECPATH "/bin/sh"
 /// @def the execution shell itself
@@ -44,17 +41,6 @@ typedef enum isValid
     INVALID = -1, VALID
 } isValid;
 
-/*!
- * @brief structure to hold the pid and the file descriptor of the actual child process
- */
-/*typedef struct childProcess
-{
-    pid_t parentpid; // bl�de Frage aber wozu is die? wird nie verwendet ---------------------------------------------------------------------------------------
-    pid_t childpid;
-    int *fd;
-    FILE *filepointer;
-} childProcess;*/
-
 // --------------------------------------------------------------- globals --
 
 /*! @var pid process id number for the current child process, needed because mypclose need to wait for this process */
@@ -66,8 +52,6 @@ static pid_t childpid = -1;
 static FILE *filepointer = NULL;
 
 // ------------------------------------------------------------- functions --
-
-static void printError(const char *errorMessage, int lineNumber);
 
 static isValid commandCheck(const char *command, const char *type);
 
@@ -95,14 +79,7 @@ static void ChildPipeStream(int modus, int fd[]);
  * @param errorMessage char pointer with the message text
  * @param lineNumber integer with the lin number the message comes from
  */
-static void printError(const char *errorMessage, int lineNumber)
-{
-    if (errorMessage != NULL)
-    {
-        fprintf(stderr, "%d %s, errno: %d, errdescr: %s\n", lineNumber, errorMessage, errno, strerror(errno));
-    }
-    // no return?---------------------------------------------------------------------------------------------------------------------------------
-}
+
 // TODO: delete this code after debugging.
 /*static void testingPrint(const char *testingMessage)
 {
@@ -125,11 +102,9 @@ extern FILE *mypopen(const char *command, const char *type)
         return NULL;
     }
 
-    // Check if the given arguments are valid
+    // Check if the given arguments are valid, errno is set in the function
     if (commandCheck(command, type) == INVALID)
     {
-        //errno = EINVAL; unn�tig oder in commandCheck unn�tig--------------------------------------------------------------------------------auskommentiert
-        //fprintf(stderr, "Illegal input: %s", strerror(errno)); //should be printed in stderr? ------------------------------------------------------auskommentiert
         return NULL;
     }
 
@@ -139,7 +114,6 @@ extern FILE *mypopen(const char *command, const char *type)
     // create a new pipe for the program with error checking
     if (pipe(fd) == -1)
     {
-        //printError("Error in creating pipe", __LINE__); //should be printed in stderr?----------------------------------------------------------------auskommentiert
         errno = ECHILD;
         return NULL;
     }
@@ -150,15 +124,16 @@ extern FILE *mypopen(const char *command, const char *type)
     switch (childpid)
     {
         case -1:
-            printError("Error in fork process", __LINE__);
+        {
             // store errno local to not get overwritten by close
             const int err = errno;
             // Closing the pipes end if the fork process failed
             close(fd[M_READ]);
             close(fd[M_WRITE]);
             errno = err;
-            return NULL; //break what for??----------------------------------------------------------------------------------------------------------------------
+            return NULL;
             break;
+        }
 
             // we are in the child process
         case 0:
@@ -180,8 +155,7 @@ extern FILE *mypopen(const char *command, const char *type)
             }
 
             // execute the current command.
-            execl(EXECPATH, EXECSHELL, EXECCOMM, command,
-                  (char *) NULL); //das kann ich auf die schnelle ned kontrolliern --------------------------------------------
+            execl(EXECPATH, EXECSHELL, EXECCOMM, command, (char *) NULL);
 
             // if we get to this point, an error occurred,
             _exit(127);
@@ -217,6 +191,10 @@ extern FILE *mypopen(const char *command, const char *type)
 extern int mypclose(FILE *stream)
 {
 
+    /* define the needed variables */
+    int status = 0;
+    pid_t waitedChild;
+
     // If mypclose is called without any actual child open
     if (filepointer == NULL)
     {
@@ -230,60 +208,36 @@ extern int mypclose(FILE *stream)
         errno = EINVAL;
         return INVALID;
     }
-    // close file Pointer, and terminate the child process
+    // close file Pointer, flushes the stream, and terminate the child process
     if (fclose(stream) == EOF)
     {
-        // set stream to NULL
-        stream = NULL;
-        // reset global variables filepointer and childpid
+        // reset global variables filepointer and childpid, errno is set by fclose
         filepointer = NULL;
         childpid = -1;
-        printError("Error in close file", __LINE__);
         return INVALID;
     }
-
-    int status = 0;
-    pid_t waitedChild;
 
     /* wait for terminating properly the child process */
     do
     {
         waitedChild = waitpid(childpid, &status, 0);
-    } while (waitedChild == -1 && errno ==
-                                  EINTR); //check once more -----------------!!-----------------------------------------------------------------------
+    } while (waitedChild == -1 && errno == EINTR);
 
-    //printf("Exit status: %d\n", status); -----------------------------------------------------------------------------------------------------auskommentiert
-    if (WIFEXITED(status))
-    {
-        /* reset the global varaibles and return the exit value */
-        stream = NULL;
-        childpid = -1;
-        filepointer = NULL;
-        return WEXITSTATUS(status); //so richtig? ------------------------------------------------------------------------------------------------------------
-    }
-
+    /* Reset all global variables for the next process*/
     childpid = -1;
     filepointer = NULL;
-    stream = NULL;
 
-
-    printf("Exit true %d, Exit status: %d\n",
-           WIFEXITED(status), WEXITSTATUS(status)
-    );
-
-
-    if (waitedChild == -1)
+    if (waitedChild == -1) // errno is set by widpid
     {
-        printf("waited Child is -1\n");
-        stream = NULL;
-        errno = ECHILD;
         return INVALID;
     }
+    if (WIFEXITED(status))
+    {
+        return WEXITSTATUS(status);
+    }
 
-/*if an error occured */
+/*if an error occured, set the errno appropriately */
     errno = ECHILD;
-    printf("14 should reach here\n");
-
     return INVALID;
 }
 
@@ -307,17 +261,15 @@ static FILE *ParentPipeStream(int modus, int fd[])
             int statusCloseWrite = close(fd[M_WRITE]);
             if (statusCloseWrite == -1)
             {
-                //printError("Error in close write Descriptor", __LINE__); keine andere R�ckmeldung wenn es schiefgeht? ---------------auskommentiert
+                exit(EXIT_FAILURE);
             }
             // try to open a file stream to read the pipe
             parentStream = fdopen(fd[M_READ], "r");
             if (parentStream == NULL)
             {
                 // close the read end of the parents pipe
-                close(fd[M_READ]);
-                //printError("Error in read pipe", __LINE__); -------------------------------------------------------------------------auskommentiert
-                //keine R�ckmeldung f�r close -------------------------------------------------------------------------------------------------------
-                return NULL; //unn�tig weil sowieso mit return parentStream NULL returnt w�rde wenn parentStream == NULL ----------------------------
+                (void) close(fd[M_READ]);
+                return NULL;
             }
             break;
         }
@@ -327,18 +279,15 @@ static FILE *ParentPipeStream(int modus, int fd[])
             int statusCloseRead = close(fd[M_READ]);
             if (statusCloseRead == -1)
             {
-                //printError("Error in close read Descriptor", __LINE__); keine andere R�ckmeldung wenn es schiefgeht? ---------------auskommentiert
-                //printf("read: %d, write: %d\n", fd[M_READ], fd[M_WRITE]); ----------------------------------------------------------auskommentiert
+                exit(EXIT_FAILURE); // errno is set by close
             }
             // try to open a file stream to read the
             parentStream = fdopen(fd[M_WRITE], "w");
             if (parentStream == NULL)
             {
                 // close writes end of the parents pipe
-                close(fd[M_WRITE]);
-                //printError("Error in write pipe", __LINE__); -----------------------------------------------------------------------auskommentiert
-                // keine R�ckmeldung wenn close schiefgeht------------------------------------------------------------------------------------------
-                return NULL; // unn�tig wenn parentStream == NULL ----------------------------------------------------------------------------------
+                (void) close(fd[M_WRITE]); // errno is set by close
+                return NULL;
             }
             break;
         }
@@ -370,20 +319,20 @@ void ChildPipeStream(int modus, int fd[])
             (void) close(fd[M_READ]); // errno get set by close
 
             // Redirect the stdout to the pipe in order to read from pipe and check error
-            if (fd[M_WRITE] !=
-                STDOUT_FILENO) //wieso sollte es schon dort liegen? ----------------------------------------------------------VP Defensiv-
+            if (fd[M_WRITE] != STDOUT_FILENO)
             {
                 int statusDupWrite = dup2(fd[M_WRITE], STDOUT_FILENO);
                 if (statusDupWrite == -1)
                 {
                     // close the childs write pipe end in chase the dup failed.
-                    (void) close(
-                            M_WRITE); //wieso schlie�t dus nur bei einem FAIL? ------------------------------------Bei Fail schließe ich die komplette Pipe---
-                    //printError("Error in duplicating stout", __LINE__); -------------------------------------------------------------------auskommentiert
+                    (void) close(M_WRITE);
+                    _exit(EXIT_FAILURE); // Exit with error
                 }
+
+                // After redirection close the filedescriptor fd write, errno get set by close
+                (void) close(fd[M_WRITE]);
             }
-            // After redirection close the filedescriptor fd write, errno get set by close
-            (void) close(fd[M_WRITE]);
+
 
             break;
         }
@@ -400,17 +349,13 @@ void ChildPipeStream(int modus, int fd[])
                 if (statusDupRead == -1)
                 {
                     // close the childs read pipe end in chase the dup failed.
-                    close(M_READ); // wieso schlie�t dus nur bei einem FAIL? ------------------------------------------------------------------------------
-                    //btw kein error von close gecheckt?----------------------------------------------------------------------------------
-                    //printError("Error in duplicating stdin", __LINE__); --------------------------------------------------------------------auskommentiert
+                    (void) close(M_READ); // close pipe on error
+                    _exit(EXIT_FAILURE); // and leave the function with error
                 }
+                // After redirection close the filedescriptor fd write
+                (void) close(fd[M_READ]);
             }
-            // After redirection close the filedescriptor fd write
-            int statusCloseRead = close(fd[M_READ]);
-            if (statusCloseRead == -1)
-            {
-                //printError("Error in close child - read Descriptor", __LINE__); keine andere R�ckmeldung wenn es schiefgeht? ---------------auskommentiert
-            }
+
             break;
         }
             // error catch, this part should never be executed
