@@ -11,6 +11,13 @@ OBJ=mypopen.o
 HEADER=mypopen.h
 TEST=popentest
 TESTPIPE=test-pipe
+DOXYGEN=doxygen
+CD=cd
+MV=mv
+RM=rm
+GREP=grep
+EXCLUDE_PATTERN=footrulewidth
+
 
 LIB_PATH_TEST=-L./libpopentest
 LIB_PATH_PIPE=-L./libtest-pipe
@@ -34,10 +41,35 @@ test-pipe: $(OBJ)
 	    # to run command directly
 	    #./test-pipe
 
-.phony : clean
+.PHONY: clean
 
 clean:
-	rm -f *.o mypopen
+        rm -f *.o mypopen
+        rm -f popentest
+        rm -f test-pipe
 
+.PHONY: distclean
 
-# todo: insert doxy generator rule
+distclean: clean
+        $(RM) -rf doc
+
+# create doxy documentation
+doc: html pdf
+
+.PHONY: html
+
+# create html version of documentation
+html:
+        $(DOXYGEN) doxygen.dcf
+
+# create pdf version of documentation
+pdf: html
+        $(CD) doc/pdf && \
+        $(MV) refman.tex refman_save.tex && \
+        $(GREP) -v $(EXCLUDE_PATTERN) refman_save.tex > refman.tex && \
+        $(RM) refman_save.tex && \
+        make && \
+        $(MV) refman.pdf refman.save && \
+        $(RM) *.pdf *.html *.tex *.aux *.sty *.log *.eps *.out *.ind *.idx \
+          *.ilg *.toc *.tps Makefile && \
+        $(MV) refman.save refman.pdf
