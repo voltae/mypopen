@@ -1,5 +1,5 @@
 //*
-// @file mypopen
+// @file mypopen.c
 // Betriebssysteme mypopen/mypclose File.
 // Beispiel 2
 //
@@ -9,11 +9,20 @@
 //
 // @version 1
 //
-// @todo Test it more seriously and more complete.
-// @todo Review it for missing error checks.
-// @todo Review it and check the source against the rules at
-//       https://cis.technikum-wien.at/documents/bic/2/bes/semesterplan/lu/c-rules.html
-//
+/*!
+ * @brief        The mypopen() function opens a process by creating a pipe, forking, and
+       invoking the shell.  Since a pipe is by definition unidirectional,
+   @param type the argument may specify only reading or writing, not both; the
+       resulting stream is correspondingly read-only or write-only.
+
+   @param command the argument is a pointer to a null-terminated string
+       containing a shell command line.  This command is passed to /bin/sh
+       using the -c flag; interpretation, if any, is performed by the shell.
+   @return return value from popen() is a normal standard I/O stream in all
+       respects save that it must be closed with pclose() rather than
+       fclose(3), or NULL if fail
+
+ */
 
 // -------------------------------------------------------------- includes --
 
@@ -35,11 +44,14 @@ enum operation
 
 // -------------------------------------------------------------- typedefs --
 
-/// @enum distinuish between valid and invalid arguments
+/*!
+ * @brief distinuish between valid and invalid parameters. Used also as return value
+ */
 typedef enum isValid
 {
-    INVALID = -1, VALID
-} isValid;
+    INVALID = -1, /*!<enum value INVALID has the numeric value of = -1 */
+    VALID         /*!<enum value VALID has the numeric value of 0 */
+} isValid; /*! enum variable as typedef */
 
 // --------------------------------------------------------------- globals --
 
@@ -80,14 +92,11 @@ static FILE *ParentPipeStream(int modus, int fd[]);
 static void ChildPipeStream(int modus, int fd[]);
 
 /*!
-* @brief Implementation of a simplifed popen() library function
-*
-* This is the main entry point for any C program.
-*
-* @param command argument is a pointer to a null-terminated string containing a shell command line. This command is passed to /bin/sh using  the -c  flag;  interpretation, if any, is performed by the shell.
-* @param type a pointer to a null-terminated string  which  must  contain either the letter 'r' for reading or the letter 'w' for writing.
-* @return FILE Pointer connecting parent and shell in success case, NULL in case it fails
-*/
+ * @brief simplyfied popen() function, function takes a command and executes the given command in an child process. Commands are liunx/unix shell commands.
+ * @param command argument is a pointer to a null-terminated string containing a shell command line. This command is passed to /bin/sh using  the -c  flag;  interpretation, if any, is performed by the shell.
+ * @param type a pointer to a null-terminated string  which  must  contain either the letter 'r' for reading or the letter 'w' for writing.
+ * @return  FILE Pointer connecting parent and shell in success case, NULL in case it fails
+ */
 extern FILE *mypopen(const char *command, const char *type)
 {
 
@@ -157,7 +166,7 @@ extern FILE *mypopen(const char *command, const char *type)
             execl(EXECPATH, EXECSHELL, EXECCOMM, command, (char *) NULL);
 
             // if we get to this point, an error occurred,
-            _exit(127);
+            _exit(EXIT_FAILURE);
             break;
         }
 
@@ -184,9 +193,6 @@ extern FILE *mypopen(const char *command, const char *type)
 
     return filepointer;
 }
-
-/// @brief
-/// @returns the exit status of the wait system call
 /*!
  * @brief The mypclose() function waits for the associated process to terminate and returns the exit status of the command as returned by wait(2).
  * @param stream a filestream created by a previous mypopen command,
@@ -198,7 +204,6 @@ extern int mypclose(FILE *stream)
     /* define the needed variables */
     int status = 0;
     pid_t waitedChild;
-
     // If mypclose is called without any actual child open
     if (filepointer == NULL)
     {
@@ -231,7 +236,6 @@ extern int mypclose(FILE *stream)
     childpid = -1;
     filepointer = NULL;
 
-    fprintf(stderr, "STATUS: %d\n", WIFEXITED(status));
 
     if (waitedChild == -1) // errno is set by widpid
     {
