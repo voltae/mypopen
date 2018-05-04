@@ -29,17 +29,26 @@
 #include "mypopen.h"
 
 // --------------------------------------------------------------- defines --
-/// @def path to the execution shell
+/*!
+ * @brief path to the execution shell
+ */
 #define EXECPATH "/bin/sh"
-/// @def the execution shell itself
+
+/*!
+ * @brief the execution shell itself
+ */
 #define EXECSHELL "sh"
-/// @def execution command
+
+/*!
+ * @brief execution command
+ */
 #define EXECCOMM "-c"
 // ------------------------------------------------------------------ enum --
 /// @enum distinguish between read file and write file
 enum operation
 {
-    M_READ, M_WRITE
+    M_READ, /*! <enum value M_READ (0) is for pipe read mode */
+    M_WRITE /*! <enum value M_WRITE (1) is for pipe write mode */
 };
 
 // -------------------------------------------------------------- typedefs --
@@ -55,12 +64,13 @@ typedef enum isValid
 
 // --------------------------------------------------------------- globals --
 
-/*! @var pid process id number for the current child process, needed because mypclose need to wait for this process */
+
+/*!
+ * @brief file local (static) pid_t variable stores the number for the current child process, needed because mypclose need to wait for this process */
 static pid_t childpid = -1;
 
 /*!
- * @brief local varialbe points to the current open filestream
- */
+ * @brief file local static pointer to FILE *stream points to the current open filestream, created by the current process. Keeps track of the open processes.*/
 static FILE *filepointer = NULL;
 
 // ------------------------------------------------------------- functions --
