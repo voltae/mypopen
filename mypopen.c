@@ -1,16 +1,17 @@
-//*
-// @file mypopen.c
-// Betriebssysteme mypopen/mypclose File.
-// Beispiel 2
-//
-// @author Valentin Platzgummer <ic17b096@technikum-wien.at>
-// @author Lara Kammerer <ic17b001@technikum-wien.at>
-// @date 2018/04/23
-//
-// @version 1
-//
 /*!
- * @brief        The mypopen() function opens a process by creating a pipe, forking, and
+* @file mypopen.c
+* Betriebssysteme mypopen/mypclose File.
+* Beispiel 2
+*
+* @author Valentin Platzgummer <ic17b096@technikum-wien.at>
+* @author Lara Kammerer <ic17b001@technikum-wien.at>
+* @date 2018/04/23
+*
+* @version 1.5
+*/
+
+/*!
+ * @brief The mypopen() function opens a process by creating a pipe, forking, and
        invoking the shell.  Since a pipe is by definition unidirectional,
    @param type the argument may specify only reading or writing, not both; the
        resulting stream is correspondingly read-only or write-only.
