@@ -18,8 +18,8 @@ LIB_TEST=-lpopentest
 LIB_PIPE=-ltest-pipe
 
 
-%.c: %o
-	    $(CC) $(CFLAGS) -c
+%.c: %o $(HEADER)
+	    $(CC) $(CFLAGS) $(HEADER) -c
 
 all: test test-pipe
 

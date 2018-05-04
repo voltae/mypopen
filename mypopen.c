@@ -53,13 +53,30 @@ static FILE *filepointer = NULL;
 
 // ------------------------------------------------------------- functions --
 
+/*!
+ * @brief check function input against valitity
+ * @param command the command to execute
+ * @param type either 'r' or 'w', read or write
+ * @return isValid, an enum returning if valid or not
+ */
 static isValid commandCheck(const char *command, const char *type);
 
 // check if char is in string
 /*static int isCharInString(const char * string);*/
 
+/*!
+ * @brief Creates the parent side of the pipe
+ * @param modus defines the mode in witch the pipe is in, either 'M_READ' or 'M_WRITE'
+ * @param fd an integer array, holds the number of the file descriptor created by the crate pipe process
+ * @return a FILE Pointer to the pipe, to witch can be read or written
+ */
 static FILE *ParentPipeStream(int modus, int fd[]);
 
+/*!
+ * @brief Creates the child side of the pipe
+ * @param modus defines the mode in witch the pipe is in, either 'M_READ' or 'M_WRITE'
+ * @param fd an integer array, holds the number of the file descriptor created by the crate pipe process
+ */
 static void ChildPipeStream(int modus, int fd[]);
 
 /*!
@@ -67,28 +84,10 @@ static void ChildPipeStream(int modus, int fd[]);
 *
 * This is the main entry point for any C program.
 *
-* @param command the number of arguments
-* @param type the arguments itselves (including the program name in argv[0])
-*
-* @retval FILE Pointer connecting parent and shell in success case
-* @retval NULL in case it fails
-*
+* @param command argument is a pointer to a null-terminated string containing a shell command line. This command is passed to /bin/sh using  the -c  flag;  interpretation, if any, is performed by the shell.
+* @param type a pointer to a null-terminated string  which  must  contain either the letter 'r' for reading or the letter 'w' for writing.
+* @return FILE Pointer connecting parent and shell in success case, NULL in case it fails
 */
-/*!
- * @brief Function prints out Messages for debugging including line number
- * @param errorMessage char pointer with the message text
- * @param lineNumber integer with the lin number the message comes from
- */
-
-// TODO: delete this code after debugging.
-/*static void testingPrint(const char *testingMessage)
-{
-    printf("line: %d, message: %s\n", __LINE__, testingMessage);
-}*/
-
-/// @brief simplifiesd implementation of the library command popen
-/// @param The  command argument is a pointer to a null-terminated string containing a shell command line.  This command is passed to /bin/sh using  the -c  flag;  interpretation, if any, is performed by the shell.
-/// @param type The type argument is a pointer to a null-terminated string  which  must  contain either the letter 'r' for reading or the letter 'w' for writing.
 extern FILE *mypopen(const char *command, const char *type)
 {
 
@@ -186,8 +185,13 @@ extern FILE *mypopen(const char *command, const char *type)
     return filepointer;
 }
 
-/// @brief The pclose() function waits for the associated process to terminate and returns the exit status of the command as returned by wait4(2).
+/// @brief
 /// @returns the exit status of the wait system call
+/*!
+ * @brief The mypclose() function waits for the associated process to terminate and returns the exit status of the command as returned by wait(2).
+ * @param stream a filestream created by a previous mypopen command,
+ * @return the exit status of the terminated child or if the exit status failed, -1
+ */
 extern int mypclose(FILE *stream)
 {
 
@@ -227,6 +231,8 @@ extern int mypclose(FILE *stream)
     childpid = -1;
     filepointer = NULL;
 
+    fprintf(stderr, "STATUS: %d\n", WIFEXITED(status));
+
     if (waitedChild == -1) // errno is set by widpid
     {
         return INVALID;
@@ -243,11 +249,11 @@ extern int mypclose(FILE *stream)
 
 /// @brief configure the parent process
 ///
-/// @param modus ste the parent either to read 0 or write 1
+/// @param modus the parent either to read 0 or write 1
 /// @param fd[] array of file descriptors
 ///
-/// @return file Pointer to stream on sucess, null on failure
-/// @error errno is set appropately
+/// @return file Pointer to stream on success, null on failure
+/// @error errno is set appropriately
 static FILE *ParentPipeStream(int modus, int fd[])
 {
     errno = 0;
@@ -304,7 +310,7 @@ static FILE *ParentPipeStream(int modus, int fd[])
 }
 
 /// @brief Create the file stream for the child process
-/// @param modus 0 for read, 1 for write
+/// @param modus M_READ (0) for reading pipe, M_WRITE (1) for write to pipe
 /// @return nothing
 /// @error errno is set, function leaves with exit failure
 void ChildPipeStream(int modus, int fd[])
@@ -350,7 +356,7 @@ void ChildPipeStream(int modus, int fd[])
                 {
                     // close the childs read pipe end in chase the dup failed.
                     (void) close(M_READ); // close pipe on error
-                    _exit(EXIT_FAILURE); // and leave the function with error
+                    _exit(EXIT_FAILURE); // and leave the function with error // default was EXIT_FAILURE
                 }
                 // After redirection close the filedescriptor fd write
                 (void) close(fd[M_READ]);
@@ -385,7 +391,6 @@ static isValid commandCheck(const char *command, const char *type)
     //first do the correct type check. type is only 1 element long and either 'w' or 'r'
     if ((type[0] != 'w' && type[0] != 'r') || type[1] != 0)
     {
-        //printError("Type check wrong", __LINE__);----------------------------------------------------------------------------auskommentiert
         // set errno to invalid operation
         errno = EINVAL;
         return INVALID;

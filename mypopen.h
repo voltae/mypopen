@@ -27,6 +27,4 @@ extern FILE *mypopen (const char *command, const char *type);
 
 extern int mypclose (FILE *stream);
 
-
-
 #endif //MYPOPEN_MPOPEN_H
